@@ -13,16 +13,18 @@ it uses a different letter to distinguish between parts on their initial positio
 
 Then the representation is :
 
-'.' : an empty cell
-'*' : an empty cell that is a target for en 'en-passant' pawn attack.
-'H/h' : rook at initial position
-'R/r' : rook that have moved
-'N/n' : knight
-'B/b' : bishop
-'Q/q' : queen
-'P/p' : pawn
-'A/a' : king at initial position
-'Z/z' : king after it has moved
+---------------------------------------------------------------------------
+| '.'   | an empty cell                                                   |
+| '*'   | an empty cell that is a target for en 'en-passant' pawn attack. |
+| 'H/h' | rook at initial position                                        |
+| 'R/r' | rook that have moved                                            |
+| 'N/n' | knight                                                          |
+| 'B/b' | bishop                                                          |
+| 'Q/q' | queen                                                           |
+| 'P/p' | pawn                                                            |
+| 'A/a' | king at initial position                                        |
+| 'Z/z' | king after it has moved                                         |
+---------------------------------------------------------------------------
 
 The initial board state representation is :
 ```
