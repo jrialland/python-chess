@@ -32,17 +32,17 @@ The initial board state representation is :
 HNBQABNHPPPPPPPP................................pppppppphnbqabnh
 ```
 
-Wich is better viewed as :
+Which corresponds to the following chess board :
 ```
 #########
-#hnbqabnh
+#hnbqabnh  <-- black side
 #pppppppp
 #........
 #........
 #........
 #........
 #PPPPPPPP
-#HNBQABNH
+#HNBQABNH  <-- white side
 ```
 
 
