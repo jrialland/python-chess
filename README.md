@@ -13,7 +13,8 @@ it uses a different letter to distinguish between parts on their initial positio
 
 Then the representation is :
 
----------------------------------------------------------------------------
+|character| signification
+|-------|-----------------------------------------------------------------|
 | '.'   | an empty cell                                                   |
 | '*'   | an empty cell that is a target for en 'en-passant' pawn attack. |
 | 'H/h' | rook at initial position                                        |
