@@ -1,0 +1,3 @@
+rm -f chess.log
+rm -f xboard.debug
+xboard -debugMode true -cp -fcp "python chess3.py" -scp "/usr/games/fairymax"
