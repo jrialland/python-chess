@@ -67,19 +67,20 @@ xboard -debugMode true -cp -fcp "python chess3.py" -scp "python chess3.py"
 
 A typical xboard session : 
 ```
+(XBoard UI)                   (chess3)
 xboard
-tellics say     chess3 engine 0.1
-tellics say     (c) Julien Rialland, All rights reserved.
+                              tellics say     chess3 engine 0.1
+                              tellics say     (c) Julien Rialland, All rights reserved.
 new
 d2d4
-move e7e6
-#########
-#hnbqabnh
-#pppp.ppp
-#....p...
-#........
-#...P....
-#........
-#PPP.PPPP
-#HNBQABNH
+                              move e7e6
+                              #########
+                              #hnbqabnh
+                              #pppp.ppp
+                              #....p...
+                              #........
+                              #...P....
+                              #........
+                              #PPP.PPPP
+                              #HNBQABNH
 ```
