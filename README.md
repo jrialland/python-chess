@@ -15,16 +15,16 @@ Then the representation is :
 
 |character| signification
 |-------|-----------------------------------------------------------------|
-| '.'   | an empty cell                                                   |
-| '*'   | an empty cell that is a target for en 'en-passant' pawn attack. |
-| 'H/h' | rook at initial position                                        |
-| 'R/r' | rook that have moved                                            |
-| 'N/n' | knight                                                          |
-| 'B/b' | bishop                                                          |
-| 'Q/q' | queen                                                           |
-| 'P/p' | pawn                                                            |
-| 'A/a' | king at initial position                                        |
-| 'Z/z' | king after it has moved                                         |
+| .   | an empty cell                                                   |
+| *   | an empty cell that is a target for en 'en-passant' pawn attack. |
+| H or h | rook at initial position                                        |
+| R or r | rook that have moved                                            |
+| N or n | knight                                                          |
+| B or b | bishop                                                          |
+| Q or q | queen                                                           |
+| P or p | pawn                                                            |
+| A or a | king at initial position                                        |
+| Z or z | king after it has moved                                         |
 ---------------------------------------------------------------------------
 
 The initial board state representation is :
