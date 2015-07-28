@@ -5,11 +5,13 @@ import logging
 import sys
 import re
 import random
+from multiprocessing import Pool, cpu_count
 
 TEAM_WHITES = 1
 TEAM_BLACKS = -1
 ROOK_DIRECTIONS = [(1, 0), (-1, 0), (0, -1), (0, 1)]
 BISHOP_DIRECTIONS = [(-1, 1), (1, 1), (1, -1), (-1, -1)]
+QUEEN_DIRECTIONS = ROOK_DIRECTIONS + BISHOP_DIRECTIONS
 KNIGHT_MOVES = [
     (-2, -1), (-1, -2), (1, -2), (2, -1), (2, 1), (1, 2), (-1, 2), (-2, 1)]
 KING_MOVES = [
@@ -208,7 +210,7 @@ class BoardState:
             for m in self._explore_moves(i, j, BISHOP_DIRECTIONS, team):
                 yield m
         elif self.is_queen(i, j, team):
-            for m in self._explore_moves(i, j, BISHOP_DIRECTIONS + ROOK_DIRECTIONS, team):
+            for m in self._explore_moves(i, j, QUEEN_DIRECTIONS, team):
                 yield m
         elif self.is_knight(i, j, team):
             for di, dj in KNIGHT_MOVES:
@@ -270,6 +272,7 @@ class BoardState:
         return True
 
     def _explore_threat(self, i, j, team, directions, searched):
+        """ for a set of directions provided for a 'slider' part, returns true if a part of that kind is attacking the current position"""
         for di, dj in directions:
             x, y, go = i + di, j + dj, True
             while go:
@@ -380,7 +383,7 @@ class BoardState:
 
 class EvalNode:
 
-    """represents a node in the minimax evaluation tree"""
+    """Represents a node in the minimax evaluation tree"""
 
     def __init__(self, board, team, fromMove=None):
         self.board = board
@@ -393,6 +396,7 @@ class EvalNode:
             yield EvalNode(self.board.apply_move(move), opp, move)
 
     def score(self):
+        """Evaluates the material on the board. the scores for each part are just the ones from Claude Shannon's paper (doubled for convenience)"""
         s, names = ('PBNHRQpbnhrq' if self.team == TEAM_WHITES else 'pbnhrqPBNHRQ'), [
             2, 6, 6, 10, 10, 18, -2, -6, -6, -10, -10, -18]
         values = dict(zip(s, names))
@@ -423,19 +427,34 @@ def negamax_alphabeta(evalNode, a=-sys.maxint, b=sys.maxint, depth=3):
                         return bestscore
         return bestscore
 
+def _eval_move(args):
+    board, move, opponent_team = args
+    boardafter = board.apply_move(move)
+    e = EvalNode(boardafter, opponent_team, move)
+    score = -negamax_alphabeta(e)
+    return score, move, boardafter
 
 def find_best_move(board, my_team):
-    """scan the best possible move for my_team, using minimax"""
+    """scan the best possible move for my_team, using minimax. some multiprocessing helps improving performances a bit"""
     opponent_team = opponent(my_team)
-    moves = []
-    for move in board.legal_moves(my_team):
-        e = EvalNode(board.apply_move(move), opponent_team, move)
-        score = -negamax_alphabeta(e)
-        moves.append((score, move))
+    process_pool = Pool(cpu_count())
+    moves = process_pool.map(_eval_move, [(board, m, opponent_team) for m in board.legal_moves(my_team)])
+    
+    boardsafter ={move:boardafter for score, move, boardafter in moves}
+    
     if len(moves) > 0:
-        maxscore, maxmove = max(moves, key=lambda x: x[0])
+        maxscore, maxmove, boardafter = max(moves, key=lambda x: x[0])
         if len(moves) > 1:
-            return random.choice([move for score, move in moves if score == maxscore])
+	    kept = [move for score, move, boardafter in moves if score == maxscore]
+	    
+	    #always prefer the one that put the opponent in check
+	    for move in kept:
+	        boardafter = boardsafter[move]
+	        if boardafter.is_check(opponent_team):
+		    return move
+		  
+	    #if there is still a choice to make, choose any
+            return random.choice(kept)
         return maxmove
     else:
         return None
@@ -524,7 +543,7 @@ def xboard_play(input=sys.stdin, output=sys.stdout):
                 logging.debug('(ignored command : ' + cmd + ')')
 
 if __name__ == '__main__':
-    logging.basicConfig(filename='chess.log', level=logging.DEBUG)
+    logging.basicConfig(filename=re.sub('py$','log',sys.argv[0]), level=logging.DEBUG)
     line = sys.stdin.readline()
     if line == 'xboard\n':
         logging.debug("Switching to XBoard mode")
