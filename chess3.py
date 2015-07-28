@@ -367,6 +367,19 @@ class BoardState:
 
         return BoardState(repr=''.join(r))
 
+    def score(self, team):
+        """Evaluates the material on the board. the scores for each part are just the ones from Claude Shannon's paper (doubled for convenience)"""
+        s, names = ('PBNHRQpbnhrq' if team == TEAM_WHITES else 'pbnhrqPBNHRQ'), [
+            2, 6, 6, 10, 10, 18, -2, -6, -6, -10, -10, -18]
+        values = dict(zip(s, names))
+        score = sum([values[x] for x in self._repr if x in values])
+        check = self.is_check(opponent(team))
+        if check == CHECK:
+            score += 1
+        elif check == CHECKMATE:
+            score += 100
+        return score
+
     def __str__(self):
         return '#' * 9 + '\n' + '\n'.join(['#' + self._repr[i:i + 8] for i in range(56, -1, -8)])
 
@@ -381,44 +394,15 @@ class BoardState:
             return BoardState(repr=repr)
 
 
-class EvalNode:
-
-    """Represents a node in the minimax evaluation tree"""
-
-    def __init__(self, board, team, fromMove=None):
-        self.board = board
-        self.team = team
-        self.fromMove = fromMove
-
-    def children(self):
-        opp = opponent(self.team)
-        for move in self.board.legal_moves(self.team):
-            yield EvalNode(self.board.apply_move(move), opp, move)
-
-    def score(self):
-        """Evaluates the material on the board. the scores for each part are just the ones from Claude Shannon's paper (doubled for convenience)"""
-        s, names = ('PBNHRQpbnhrq' if self.team == TEAM_WHITES else 'pbnhrqPBNHRQ'), [
-            2, 6, 6, 10, 10, 18, -2, -6, -6, -10, -10, -18]
-        values = dict(zip(s, names))
-        score = sum([values[x] for x in self.board._repr if x in values])
-        check = self.board.is_check(opponent(self.team))
-        if check == CHECK:
-            score += 1
-        elif check == CHECKMATE:
-            score += 100
-        return score
-
-    def move(self):
-        return self.fromMove
-
-
-def negamax_alphabeta(evalNode, a=-sys.maxint, b=sys.maxint, depth=3):
+def negamax_alphabeta(board, team, a=-sys.maxint, b=sys.maxint, depth=3):
     if depth == 0:
-        return evalNode.score()
+        return board.score(team)
     else:
         bestscore, bestmove = -sys.maxint, None
-        for child in evalNode.children():
-            score = -negamax_alphabeta(child, -b, -a, depth - 1)
+        for childmove in board.legal_moves(team):
+            score = - \
+                negamax_alphabeta(
+                    board.apply_move(childmove), opponent(team), -b, -a, depth - 1)
             if score > bestscore:
                 bestscore = score
                 if bestscore > a:
@@ -427,33 +411,35 @@ def negamax_alphabeta(evalNode, a=-sys.maxint, b=sys.maxint, depth=3):
                         return bestscore
         return bestscore
 
+
 def _eval_move(args):
     board, move, opponent_team = args
     boardafter = board.apply_move(move)
-    e = EvalNode(boardafter, opponent_team, move)
-    score = -negamax_alphabeta(e)
+    score = -negamax_alphabeta(boardafter, opponent_team)
     return score, move, boardafter
 
-def find_best_move(board, my_team):
+
+def find_best_move(process_pool, board, my_team):
     """scan the best possible move for my_team, using minimax. some multiprocessing helps improving performances a bit"""
     opponent_team = opponent(my_team)
-    process_pool = Pool(cpu_count())
-    moves = process_pool.map(_eval_move, [(board, m, opponent_team) for m in board.legal_moves(my_team)])
-    
-    boardsafter ={move:boardafter for score, move, boardafter in moves}
-    
+    moves = process_pool.map(
+        _eval_move, [(board, m, opponent_team) for m in board.legal_moves(my_team)])
+
+    boardsafter = {move: boardafter for score, move, boardafter in moves}
+
     if len(moves) > 0:
         maxscore, maxmove, boardafter = max(moves, key=lambda x: x[0])
         if len(moves) > 1:
-	    kept = [move for score, move, boardafter in moves if score == maxscore]
-	    
-	    #always prefer the one that put the opponent in check
-	    for move in kept:
-	        boardafter = boardsafter[move]
-	        if boardafter.is_check(opponent_team):
-		    return move
-		  
-	    #if there is still a choice to make, choose any
+            kept = [
+                move for score, move, boardafter in moves if score == maxscore]
+
+            # always prefer the one that put the opponent in check
+            for move in kept:
+                boardafter = boardsafter[move]
+                if boardafter.is_check(opponent_team):
+                    return move
+
+            # if there is still a choice to make, choose any
             return random.choice(kept)
         return maxmove
     else:
@@ -468,6 +454,9 @@ def xboard_play(input=sys.stdin, output=sys.stdout):
         logging.debug('<< ' + cmd)
         output.write(cmd + '\n')
         output.flush()
+
+    process_pool = Pool(cpu_count())
+
     board = None
     my_team = None
     playing_now = None
@@ -495,9 +484,10 @@ def xboard_play(input=sys.stdin, output=sys.stdout):
             pass
         elif cmd == 'go':  # start playing
             # tells the engine to start playing for the side that now has the move (regardless of what it was doing before),
-            #and keep spontaneously generating moves for that side each thime that side has to move again.
+            # and keep spontaneously generating moves for that side each thime
+            # that side has to move again.
             if playing_now == my_team:
-                mymove = find_best_move(board, my_team)
+                mymove = find_best_move(process_pool, board, my_team)
                 if mymove:
                     respond('move ' + mymove.to_xboard_notation())
                     board = board.apply_move(mymove)
@@ -531,7 +521,7 @@ def xboard_play(input=sys.stdin, output=sys.stdout):
 
                 # evaluate what to play
                 playing_now = my_team
-                mymove = find_best_move(board, my_team)
+                mymove = find_best_move(process_pool, board, my_team)
                 if mymove:
                     respond('move ' + mymove.to_xboard_notation())
                     board = board.apply_move(mymove)
@@ -543,7 +533,8 @@ def xboard_play(input=sys.stdin, output=sys.stdout):
                 logging.debug('(ignored command : ' + cmd + ')')
 
 if __name__ == '__main__':
-    logging.basicConfig(filename=re.sub('py$','log',sys.argv[0]), level=logging.DEBUG)
+    logging.basicConfig(
+        filename=re.sub('py$', 'log', sys.argv[0]), level=logging.DEBUG)
     line = sys.stdin.readline()
     if line == 'xboard\n':
         logging.debug("Switching to XBoard mode")
