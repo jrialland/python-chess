@@ -13,33 +13,36 @@ it uses a different letter to distinguish between parts on their initial positio
 
 Then the representation is :
 
-'.' : an empty cell
-'*' : an empty cell that is a target for en 'en-passant' pawn attack.
-'H/h' : rook at initial position
-'R/r' : rook that have moved
-'N/n' : knight
-'B/b' : bishop
-'Q/q' : queen
-'P/p' : pawn
-'A/a' : king at initial position
-'Z/z' : king after it has moved
+|character| signification
+|-------|-----------------------------------------------------------------|
+| .   | an empty cell                                                   |
+| *   | an empty cell that is a target for en 'en-passant' pawn attack. |
+| H or h | rook at initial position                                        |
+| R or r | rook that have moved                                            |
+| N or n | knight                                                          |
+| B or b | bishop                                                          |
+| Q or q | queen                                                           |
+| P or p | pawn                                                            |
+| A or a | king at initial position                                        |
+| Z or z | king after it has moved                                         |
+---------------------------------------------------------------------------
 
 The initial board state representation is :
 ```
 HNBQABNHPPPPPPPP................................pppppppphnbqabnh
 ```
 
-Wich is better viewed as :
+Which corresponds to the following chess board :
 ```
 #########
-#hnbqabnh
+#hnbqabnh  <-- black side
 #pppppppp
 #........
 #........
 #........
 #........
 #PPPPPPPP
-#HNBQABNH
+#HNBQABNH  <-- white side
 ```
 
 
@@ -67,19 +70,20 @@ xboard -debugMode true -cp -fcp "python chess3.py" -scp "python chess3.py"
 
 A typical xboard session : 
 ```
+(XBoard UI)                   (chess3)
 xboard
-tellics say     chess3 engine 0.1
-tellics say     (c) Julien Rialland, All rights reserved.
+                              tellics say     chess3 engine 0.1
+                              tellics say     (c) Julien Rialland, All rights reserved.
 new
 d2d4
-move e7e6
-#########
-#hnbqabnh
-#pppp.ppp
-#....p...
-#........
-#...P....
-#........
-#PPP.PPPP
-#HNBQABNH
+                              move e7e6
+                              #########
+                              #hnbqabnh
+                              #pppp.ppp
+                              #....p...
+                              #........
+                              #...P....
+                              #........
+                              #PPP.PPPP
+                              #HNBQABNH
 ```
