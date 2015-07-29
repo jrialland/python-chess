@@ -383,6 +383,84 @@ class BoardState:
     def __str__(self):
         return '#' * 9 + '\n' + '\n'.join(['#' + self._repr[i:i + 8] for i in range(56, -1, -8)])
 
+    def pretty_str(self, comment=True, unicode=False):
+        rep = self._repr.replace('a', 'k').replace('A', 'K').replace('z', 'k').replace(
+            'Z', 'K').replace('h', 'r').replace('H', 'R').replace('.', ' ')
+        if unicode:
+            tr = dict(zip('prnbqkPRNBQK', '♟♜♞♝♛♚♙♖♘♗♕♔'))
+            rep = ''.join([tr[c] if c in tr else c for c in rep])
+        sep = '   ' + '+---' * 8 + '+'
+        s = [sep]
+        for l in [str(1 + i / 8) + '. | ' + ' | '.join(list(rep[i:i + 8])) + ' |' for i in range(56, -1, -8)]:
+            s += [l, sep]
+        s += ['     ' + '.  '.join('abcdefgh') + '.']
+        if comment:
+            return '#    ' + '\n#    '.join(s)
+        else:
+            return '\n'.join(s)
+
+    def to_FEN(self, team=TEAM_WHITES, halfmoves=0, moves=1):
+        """Convert to the standard FEN representation"""
+        fen = ''
+        for j in range(7, -1, -1):
+            fen += self._repr[j * 8:j * 8 + 8] + '/'
+        fen = fen[:-1]
+        fen = re.sub('a|z', 'k', fen)
+        fen = re.sub('A|Z', 'K', fen)
+        fen = re.sub('h', 'r', fen)
+        fen = re.sub('H', 'R', fen)
+        for j in range(8, 0, -1):
+            fen = fen.replace(j * '.', str(j))
+        fen += ' ' + ['b', 'w'][team == TEAM_WHITES]
+        castlings = ''
+        if self._repr[4] == 'A':
+            if self._repr[7] == 'H':
+                castlings += 'K'
+            if self._repr[0] == 'H':
+                castlings += 'Q'
+        if self._repr[60] == 'a':
+            if self._repr[63] == 'h':
+                castlings += 'k'
+            if self._repr[56] == 'h':
+                castlings += 'q'
+        if castlings == '':
+            fen += ' -'
+        else:
+            fen += ' ' + castlings
+        if self.enpassant_cell is None:
+            fen += ' -'
+        else:
+            fen += ' ' + to_pos(*self.enpassant_cell)
+        fen += ' ' + str(halfmoves) + ' ' + str(moves)
+        return fen
+
+    @classmethod
+    def from_FEN(clazz, fen):
+        positions, turn, castlings, enpassant, halfmoves, moves = fen.strip().split(
+            ' ')
+        rep = ''.join(positions.split('/')[::-1])
+        for i in range(1, 9):
+            rep = rep.replace(str(i), i * '.')
+        rep = rep.replace('k', 'z')
+        rep = rep.replace('K', 'Z')
+        rep = list(rep)
+        if 'K' in castlings:
+            rep[4] = 'A'
+            rep[7] = 'H'
+        if 'Q' in castlings:
+            rep[4] = 'A'
+            rep[0] = 'H'
+        if 'k' in castlings:
+            rep[60] = 'a'
+            rep[63] = 'h'
+        if 'q' in castlings:
+            rep[60] = 'a'
+            rep[56] = 'h'
+        board = BoardState(repr=''.join(
+            rep), enpassant_cell=None if enpassant == '-' else to_coord(enpassant))
+        team = [TEAM_BLACKS, TEAM_WHITES][turn == 'w']
+        return board, team
+
     @classmethod
     def from_repr(clazz, repr):
         """parses a board representation, returning a BoardState instance"""
@@ -457,50 +535,96 @@ def xboard_play(input=sys.stdin, output=sys.stdout):
 
     process_pool = Pool(cpu_count())
 
-    board = None
-    my_team = None
-    playing_now = None
-    respond("tellics say     chess3 engine 0.1")
-    respond("tellics say     (c) Julien Rialland, All rights reserved.")
+    board = BoardState()
+    playing_now = TEAM_WHITES
+    my_team = TEAM_BLACKS
+
+    force_mode = False
+    history = []
+
     while True:
+
         line = input.readline()
         cmd = line.strip()
         logging.debug(">> " + cmd)
+
+        if cmd == 'xboard':
+            respond("tellics say     chess3 engine 0.1")
+            respond(
+                "tellics say     (c) Julien Rialland, All rights reserved.")
+
         # tells your engine to setup the board for a new game, and consider
         # itself playing the side that will not move first, simply awaiting
         # events idly. This means it will start searching and doing a move of
         # its own after it receives an input move.
-        if cmd == 'new':
+        elif cmd == 'new':
             board = BoardState()
+            history = []
             playing_now = TEAM_WHITES
+            my_team = TEAM_BLACKS
+            respond(board.pretty_str(comment=True))
+
         elif cmd == 'protover 2':
             respond('feature myname="Julien\'s chess3 0.1"')
-            respond('feature ping=0')
+            respond('feature ping=1')
             respond('feature sigint=0')
             respond('feature sigterm=0')
+            respond('feature setboard=1')
             respond('feature debug=1')
             respond('feature done=1')
+
+        elif cmd.startswith('ping'):
+            n = cmd.split(' ')[-1]
+            respond('pong ' + n)
+
+        elif cmd.startswith('setboard'):
+            fen = cmd[9:].strip()
+            board, playing_now = BoardState.from_FEN(fen)
+
         elif cmd == 'force':  # accept moves and just update the board
-            pass
+            force_mode = True
+
         elif cmd == 'go':  # start playing
             # tells the engine to start playing for the side that now has the move (regardless of what it was doing before),
             # and keep spontaneously generating moves for that side each thime
             # that side has to move again.
-            if playing_now == my_team:
-                mymove = find_best_move(process_pool, board, my_team)
-                if mymove:
-                    respond('move ' + mymove.to_xboard_notation())
-                    board = board.apply_move(mymove)
-                    respond(str(board))
-                    playing_now = opponent(my_team)
-                else:
+            force_mode = False
+            my_team = playing_now
+            mymove = find_best_move(process_pool, board, my_team)
+            if mymove:
+                respond('move ' + mymove.to_xboard_notation())
+                history.append(board)
+                board = board.apply_move(mymove)
+                respond(board.pretty_str(comment=True, unicode=use_unicode))
+                playing_now = opponent(my_team)
+            else:
+                if board.is_check(my_team):
                     respond('resign')
+                else:
+                    respond('1/2-1/2 {stallmate}')
+
+        elif cmd == 'undo':
+            board = history[-1]
+            history = history[:-1]
+            my_team = opponent(my_team)
+
+        elif cmd == 'remove':
+            board = history[-2]
+            history = history[:-2]
+
+        # not part of xboard protocol, only for debugging purposes
+        elif cmd == 'show':
+            respond(board.pretty_str(unicode=use_unicode))
+            respond('#MY_TEAM : ' + ['black', 'white'][my_team == TEAM_WHITES])
+            respond(
+                '#PLAYING : ' + ['black', 'white'][playing_now == TEAM_WHITES])
+
         elif cmd == 'white':
             my_team = TEAM_WHITES
+            respond('#Playing white')
         elif cmd == 'black':
             my_team = TEAM_BLACKS
-        elif cmd == '?':  # play now!
-            pass
+            respond('#Playing black')
         elif cmd == 'quit':
             return
         else:
@@ -510,6 +634,7 @@ def xboard_play(input=sys.stdin, output=sys.stdout):
                 opponent_team = board.get_team(*move._from)
                 my_team = opponent(opponent_team)
                 playing_now = opponent_team
+
                 # detect pawn promotions
                 if len(cmd) == 5:
                     move.promotion = cmd[-1]
@@ -517,27 +642,37 @@ def xboard_play(input=sys.stdin, output=sys.stdout):
                         move.promotion = move.promotion.upper()
 
                 # update the board
-                board = board.apply_move(move)
+                history.append(board)
+                try:
+                    board = board.apply_move(move, check_legal=True)
+                except Exception:
+                    respond('illegal move: ' + cmd)
+                    continue
 
-                # evaluate what to play
                 playing_now = my_team
-                mymove = find_best_move(process_pool, board, my_team)
-                if mymove:
-                    respond('move ' + mymove.to_xboard_notation())
-                    board = board.apply_move(mymove)
-                    respond(str(board))
-                    playing_now = opponent(my_team)
-                else:
-                    respond('resign')
+                # evaluate what to play
+                if not force_mode:
+                    mymove = find_best_move(process_pool, board, my_team)
+                    if mymove:
+                        respond('move ' + mymove.to_xboard_notation())
+                        history.append(board)
+                        board = board.apply_move(mymove)
+                        respond(
+                            board.pretty_str(comment=True, unicode=use_unicode))
+                        playing_now = opponent(my_team)
+                    else:
+                        if board.is_check(my_team):
+                            respond('resign')
+                        else:
+                            respond('1/2-1/2 {stallmate}')
             else:
-                logging.debug('(ignored command : ' + cmd + ')')
+                respond("#ignored command : '" + cmd + "'")
+
+use_unicode = False
 
 if __name__ == '__main__':
     logging.basicConfig(
         filename=re.sub('py$', 'log', sys.argv[0]), level=logging.DEBUG)
-    line = sys.stdin.readline()
-    if line == 'xboard\n':
-        logging.debug("Switching to XBoard mode")
-        xboard_play()
-    else:
-        raise Exception('Unkown protocol')
+    if '--unicode' in sys.argv:
+        use_unicode = True
+    xboard_play()
