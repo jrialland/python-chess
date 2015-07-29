@@ -369,16 +369,27 @@ class BoardState:
 
     def score(self, team):
         """Evaluates the material on the board. the scores for each part are just the ones from Claude Shannon's paper (doubled for convenience)"""
-        s, names = ('PBNHRQpbnhrq' if team == TEAM_WHITES else 'pbnhrqPBNHRQ'), [
-            2, 6, 6, 10, 10, 18, -2, -6, -6, -10, -10, -18]
+        s, names = ('PBNHRQpbnhrqAZaz.' if team == TEAM_WHITES else 'pbnhrqPBNHRQAZaz.'), [
+            1, 3, 3, 5, 5, 9, -1, -3, -3, -5, -5, -9,0,0,0,0,0]
         values = dict(zip(s, names))
-        score = sum([values[x] for x in self._repr if x in values])
-        check = self.is_check(opponent(team))
-        if check == CHECK:
-            score += 1
-        elif check == CHECKMATE:
-            score += 100
+        score = sum([values[x] for x in self._repr])
         return score
+
+    def count_controlled_cells(self, team):
+        count=0
+        opp=opponent(team)
+        for i in range(8):
+            for j in range(8):
+                if not self.is_same_team(i,j,team):
+                    if self.is_under_attack(i,j,opp):
+                        count+=1
+        return count
+    
+    def cells_under_attack(self, team):
+        for i in range(8):
+            for j in range(8):
+                if self.is_same_team(i,j,team) and self.is_under_attack(i,j,team):
+                    yield i,j
 
     def __str__(self):
         return '#' * 9 + '\n' + '\n'.join(['#' + self._repr[i:i + 8] for i in range(56, -1, -8)])
@@ -523,8 +534,32 @@ def find_best_move(process_pool, board, my_team):
     else:
         return None
 
+def _play(board, my_team, process_pool, history=[], respond=lambda x:sys.stdout.write(x+'\n')):
+    mymove = find_best_move(process_pool, board, my_team)
+    playing_now = my_team
+    if mymove:
+        respond('move ' + mymove.to_xboard_notation())
+        history.append(board)
+        board = board.apply_move(mymove)
+        respond(board.pretty_str(comment=True, unicode=use_unicode))
+        playing_now = opponent(my_team)
+        check=board.is_check(playing_now)
+        if check == CHECK:
+            respond('#check')
+        elif check == CHECKMATE:
+            respond('#checkmate')
+            respond('result '+['0-1','1-0'][playing_now==TEAM_WHITES]+' {checkmate}')
+        else:
+            if len(list(board.legal_moves(playing_now)))==0:
+                respond('result 1/2-1/2 {stallmate}')
+    else:
+        if board.is_check(my_team):
+            respond('resign')
+        else:
+            respond('result 1/2-1/2 {stallmate}')
+    return board, playing_now
 
-def xboard_play(input=sys.stdin, output=sys.stdout):
+def xboard_game(input=sys.stdin, output=sys.stdout):
     """plays through the xboard protocol.
        most infos found from http://home.hccnet.nl/h.g.muller/interfacing.txt
     """
@@ -542,13 +577,37 @@ def xboard_play(input=sys.stdin, output=sys.stdout):
     force_mode = False
     history = []
 
+    if output.isatty():
+        respond("#Howdy, type 'new' to start a new game, or 'help' to list supported commands")
+
+
     while True:
 
         line = input.readline()
         cmd = line.strip()
         logging.debug(">> " + cmd)
+        if cmd=='help':
+            respond("""
 
-        if cmd == 'xboard':
+chess3 supported XBoard commands:
+---------------------------------
+
+new			: Starts a new game
+setboard <FEN string>	: Setup the board to the given state
+force			: Following moves are applied to the board, without playing
+go			: Make the engine play next move
+undo			: Clears the last half-move
+remove			: Clears the last move
+show			: Displays the board
+fen			: Displays the board in FEN format (non-standard command)
+white			: Assign the engine to White
+black			: Assign the engine to Black
+<MOVE>			: Applies the move in algebric notation (i.e 'd2d4')
+quit			: Exits
+
+
+""")
+        elif cmd == 'xboard':
             respond("tellics say     chess3 engine 0.1")
             respond(
                 "tellics say     (c) Julien Rialland, All rights reserved.")
@@ -590,27 +649,22 @@ def xboard_play(input=sys.stdin, output=sys.stdout):
             # that side has to move again.
             force_mode = False
             my_team = playing_now
-            mymove = find_best_move(process_pool, board, my_team)
-            if mymove:
-                respond('move ' + mymove.to_xboard_notation())
-                history.append(board)
-                board = board.apply_move(mymove)
-                respond(board.pretty_str(comment=True, unicode=use_unicode))
-                playing_now = opponent(my_team)
-            else:
-                if board.is_check(my_team):
-                    respond('resign')
-                else:
-                    respond('1/2-1/2 {stallmate}')
+            board, playing_now = _play(board, my_team, process_pool, history, respond)
 
         elif cmd == 'undo':
-            board = history[-1]
-            history = history[:-1]
-            my_team = opponent(my_team)
+            if len(history)>0:
+                board = history[-1]
+                history = history[:-1]
+                my_team = opponent(my_team)
+            else:
+                respond('#nothing to undo')
 
         elif cmd == 'remove':
-            board = history[-2]
-            history = history[:-2]
+            if len(history)>1:
+                board = history[-2]
+                history = history[:-2]
+            else:
+                respond('#nothing to remove')
 
         # not part of xboard protocol, only for debugging purposes
         elif cmd == 'show':
@@ -618,6 +672,9 @@ def xboard_play(input=sys.stdin, output=sys.stdout):
             respond('#MY_TEAM : ' + ['black', 'white'][my_team == TEAM_WHITES])
             respond(
                 '#PLAYING : ' + ['black', 'white'][playing_now == TEAM_WHITES])
+  
+        elif cmd=='fen':
+            respond(board.to_FEN(team=playing_now, halfmoves=0, moves=len(history))) 
 
         elif cmd == 'white':
             my_team = TEAM_WHITES
@@ -627,6 +684,9 @@ def xboard_play(input=sys.stdin, output=sys.stdout):
             respond('#Playing black')
         elif cmd == 'quit':
             return
+        elif cmd.startswith('accepted ') or cmd.startswith('time ') or cmd.startswith('otim'):
+            #silently ignore some commands
+            pass
         else:
             if re.match('^[a-h][1-8][a-h][1-8].?$', cmd):
                 # receive a move from the opponent
@@ -652,27 +712,15 @@ def xboard_play(input=sys.stdin, output=sys.stdout):
                 playing_now = my_team
                 # evaluate what to play
                 if not force_mode:
-                    mymove = find_best_move(process_pool, board, my_team)
-                    if mymove:
-                        respond('move ' + mymove.to_xboard_notation())
-                        history.append(board)
-                        board = board.apply_move(mymove)
-                        respond(
-                            board.pretty_str(comment=True, unicode=use_unicode))
-                        playing_now = opponent(my_team)
-                    else:
-                        if board.is_check(my_team):
-                            respond('resign')
-                        else:
-                            respond('1/2-1/2 {stallmate}')
+                    board, playing_now = _play(board, my_team, process_pool, history, respond)
             else:
                 respond("#ignored command : '" + cmd + "'")
 
 use_unicode = False
 
 if __name__ == '__main__':
-    logging.basicConfig(
-        filename=re.sub('py$', 'log', sys.argv[0]), level=logging.DEBUG)
+    #logging.basicConfig(
+    #    filename=re.sub('py$', 'log', sys.argv[0]), level=logging.DEBUG)
     if '--unicode' in sys.argv:
         use_unicode = True
-    xboard_play()
+    xboard_game()
