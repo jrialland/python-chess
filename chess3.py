@@ -659,7 +659,7 @@ quit			: Exits
             if len(history) > 0:
                 board = history[-1]
                 history = history[:-1]
-                my_team = opponent(my_team)
+                playing_now = opponent(playing_now)
             else:
                 respond('#nothing to undo')
 
