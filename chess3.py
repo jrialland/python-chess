@@ -98,7 +98,7 @@ class Move:
 
 class BoardState:
 
-    def __init__(self, repr='HNBQABNH' + 'P' * 8 + '.' * 32 + 'p' * 8 + 'hnbqabnh', enpassant_cell=None):
+    def __init__(self, repr=list('HNBQABNH' + 'P' * 8 + '.' * 32 + 'p' * 8 + 'hnbqabnh'), enpassant_cell=None):
         self._repr = repr
         self.enpassant_cell = enpassant_cell
 
@@ -194,7 +194,7 @@ class BoardState:
             for i in range(8):
                 if self.get_team(i, j) == team:
                     for move in self._moves(i, j, team):
-                        board = self.apply_move(move)
+                        board = self.apply_move(move, team)
                         kingpos = board.find_king(team)
                         # avoid to emit moves that would lead to the king being
                         # under attack
@@ -311,11 +311,9 @@ class BoardState:
             return CHECKMATE if len(list(self.legal_moves(team))) == 0 else CHECK
         return 0
 
-    def apply_move(self, move, check_legal=False):
+    def apply_move(self, move, team, check_legal=False):
         """modifies the board by applying the move. As BoarState instances are immutable, returns a new instance of BoardState"""
         part = self.part_at(*move._from)
-        team = self.get_team(*move._from)
-
         if check_legal:
             checked = False
             for lm in self.legal_moves(team):
@@ -325,7 +323,7 @@ class BoardState:
             if not checked:
                 raise Exception('Illegal move')
 
-        r = list(self._repr)
+        r = self._repr[::]
         i, j = move._from
 
         # castling
@@ -358,14 +356,14 @@ class BoardState:
             if abs(j - y) == 2:
                 enpassant_row = 2 if team == TEAM_WHITES else 5
                 enpassant_cell = (i, enpassant_row)
-                return BoardState(repr=''.join(r), enpassant_cell=enpassant_cell)
+                return BoardState(repr=r, enpassant_cell=enpassant_cell)
 
             # a pawn has the right to take the enpassant cell
             if self.enpassant_cell == (x, y):
                 pawnrow = 3 if team == TEAM_BLACKS else 4
                 r[pawnrow * 8 + x] = '.'
 
-        return BoardState(repr=''.join(r))
+        return BoardState(repr=r)
 
     def score(self, team):
         """Evaluates the material on the board. the scores for each part are just the ones from Claude Shannon's paper"""
@@ -392,10 +390,10 @@ class BoardState:
                     yield i, j
 
     def __str__(self):
-        return '#' * 9 + '\n' + '\n'.join(['#' + self._repr[i:i + 8] for i in range(56, -1, -8)])
+        return '#' * 9 + '\n' + '\n'.join(['#' + ''.join(self._repr[i:i + 8]) for i in range(56, -1, -8)])
 
     def pretty_str(self, comment=True, unicode=False):
-        rep = self._repr.replace('a', 'k').replace('A', 'K').replace('z', 'k').replace(
+        rep = ''.join(self._repr).replace('a', 'k').replace('A', 'K').replace('z', 'k').replace(
             'Z', 'K').replace('h', 'r').replace('H', 'R').replace('.', ' ')
         if unicode:
             tr = dict(zip('prnbqkPRNBQK', '♟♜♞♝♛♚♙♖♘♗♕♔'))
@@ -467,19 +465,18 @@ class BoardState:
         if 'q' in castlings:
             rep[60] = 'a'
             rep[56] = 'h'
-        board = BoardState(repr=''.join(
-            rep), enpassant_cell=None if enpassant == '-' else to_coord(enpassant))
+        board = BoardState(repr=rep, enpassant_cell=None if enpassant == '-' else to_coord(enpassant))
         team = [TEAM_BLACKS, TEAM_WHITES][turn == 'w']
         return board, team
 
     @classmethod
     def from_repr(clazz, repr):
         """parses a board representation, returning a BoardState instance"""
-        repr = ''.join([x for x in repr if x in '.PpRHrhNnBbQqAZaz'])
+        repr = [x for x in repr if x in '.PpRHrhNnBbQqAZaz']
         if len(repr) != 64:
             raise Exception('incorrect syntax in board representation')
         else:
-            repr = ''.join([repr[i:i + 8] for i in range(56, -1, -8)])
+            repr = [repr[i:i + 8] for i in range(56, -1, -8)]
             return BoardState(repr=repr)
 
 
@@ -491,7 +488,7 @@ def negamax_alphabeta(board, team, a=-sys.maxint, b=sys.maxint, depth=3):
         for childmove in board.legal_moves(team):
             score = - \
                 negamax_alphabeta(
-                    board.apply_move(childmove), opponent(team), -b, -a, depth - 1)
+                    board.apply_move(childmove, team), opponent(team), -b, -a, depth - 1)
             if score > bestscore:
                 bestscore = score
                 if bestscore > a:
@@ -502,21 +499,22 @@ def negamax_alphabeta(board, team, a=-sys.maxint, b=sys.maxint, depth=3):
 
 
 def _eval_move(args):
-    board, move, opponent_team = args
-    boardafter = board.apply_move(move)
-    score = -negamax_alphabeta(boardafter, opponent_team)
+    board, move, team = args
+    boardafter = board.apply_move(move, team)
+    score = -negamax_alphabeta(boardafter, opponent(team))
     return score, move, boardafter
 
 
 def find_best_move(process_pool, board, my_team):
-    """scan the best possible move for my_team, using minimax. some multiprocessing helps improving performances a bit"""
-    opponent_team = opponent(my_team)
-    moves = process_pool.map(
-        _eval_move, [(board, m, opponent_team) for m in board.legal_moves(my_team)])
-
+    """scan the best possible move for my_team, using minimax."""
+    
+    moves = process_pool.map(_eval_move, [(board, m, my_team) for m in board.legal_moves(my_team)])
+    #moves = map(_eval_move, [(board, m, my_team) for m in board.legal_moves(my_team)])
+    
     boardsafter = {move: boardafter for score, move, boardafter in moves}
 
     if len(moves) > 0:
+        opponent_team = opponent(my_team)
         maxscore, maxmove, boardafter = max(moves, key=lambda x: x[0])
         if len(moves) > 1:
             kept = [
@@ -541,7 +539,7 @@ def _play(board, my_team, process_pool, history=[], respond=lambda x: sys.stdout
     if mymove:
         respond('move ' + mymove.to_xboard_notation())
         history.append(board)
-        board = board.apply_move(mymove)
+        board = board.apply_move(mymove, playing_now)
         respond(board.pretty_str(comment=True))
         playing_now = opponent(my_team)
         check = board.is_check(playing_now)
@@ -564,7 +562,7 @@ def _play(board, my_team, process_pool, history=[], respond=lambda x: sys.stdout
 
 def xboard_game(input=sys.stdin, output=sys.stdout):
     """plays through the xboard protocol.
-       most infos found from http://home.hccnet.nl/h.g.muller/interfacing.txt
+       most infos found at http://home.hccnet.nl/h.g.muller/interfacing.txt
     """
     def respond(cmd):
         logging.debug('<< ' + cmd)
@@ -700,8 +698,7 @@ quit			: Exits
             if re.match('^[a-h][1-8][a-h][1-8].?$', cmd):
                 # receive a move from the opponent
                 move = Move(to_coord(cmd[0:2]), to_coord(cmd[2:4]))
-                opponent_team = board.get_team(*move._from)
-                my_team = opponent(opponent_team)
+                opponent_team = opponent(my_team)
                 playing_now = opponent_team
 
                 # detect pawn promotions
@@ -713,7 +710,7 @@ quit			: Exits
                 # update the board
                 history.append(board)
                 try:
-                    board = board.apply_move(move, check_legal=True)
+                    board = board.apply_move(move, playing_now, check_legal=True)
                 except Exception:
                     respond('illegal move: ' + cmd)
                     continue
@@ -726,6 +723,11 @@ quit			: Exits
             else:
                 respond("#ignored command : '" + cmd + "'")
 
+
+#b = BoardState()
+#for m in b.legal_moves(TEAM_WHITES):
+#    print m
+    
 if __name__ == '__main__':
     # logging.basicConfig(
     #    filename=re.sub('py$', 'log', sys.argv[0]), level=logging.DEBUG)
