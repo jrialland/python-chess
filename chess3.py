@@ -547,11 +547,11 @@ def _play(board, my_team, process_pool, history=[], respond=lambda x: sys.stdout
             respond('#check')
         elif check == CHECKMATE:
             respond('#checkmate')
-            respond('result ' + ['0-1', '1-0']
+            respond('#result : ' + ['black wins', 'whites win']
                     [playing_now == TEAM_WHITES] + ' {checkmate}')
         else:
             if len(list(board.legal_moves(playing_now))) == 0:
-                respond('result 1/2-1/2 {stallmate}')
+                respond('#result : draw {stallmate}')
     else:
         if board.is_check(my_team):
             respond('resign')
@@ -723,10 +723,6 @@ quit			: Exits
             else:
                 respond("#ignored command : '" + cmd + "'")
 
-
-#b = BoardState()
-#for m in b.legal_moves(TEAM_WHITES):
-#    print m
     
 if __name__ == '__main__':
     # logging.basicConfig(
