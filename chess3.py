@@ -551,12 +551,12 @@ def _play(board, my_team, process_pool, history=[], respond=lambda x: sys.stdout
                     [playing_now == TEAM_WHITES] + ' {checkmate}')
         else:
             if len(list(board.legal_moves(playing_now))) == 0:
-                respond('#result : draw {stallmate}')
+                respond('#result : draw {stalemate}')
     else:
         if board.is_check(my_team):
             respond('resign')
         else:
-            respond('result 1/2-1/2 {stallmate}')
+            respond('#result : draw {stalemate}')
     return board, playing_now
 
 
