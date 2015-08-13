@@ -1,8 +1,8 @@
 # python-chess
 
-chess3 is a really simple chess engine, written in python, mainly for fun.. it barely beats a casual human player.
+chess3 is a really simple chess engine, written in python, mainly for fun..
 
-It knows all rules and can apply them : castling, en-passant, pawn promotion.
+It also features an openings book.
 
 Representation
 --------------
