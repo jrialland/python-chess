@@ -3,5 +3,5 @@ sudo: required
 
 script: 
     -  sudo apt-get update
-    -  sudo apt-get install unzip scons wine python-pip -y
+    -  sudo apt-get install xvfb unzip scons wine python-pip -y
     -  bash ./build_win32.sh chess3.py
