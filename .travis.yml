@@ -1,0 +1,1 @@
+script:./build_win32.sh chess3.py
