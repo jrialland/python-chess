@@ -117,7 +117,7 @@ wine upx391w/upx.exe dist/$exe_name
 #turn off virtual env
 deactivate
 
-kill -9 $xvfb_pid > /dev/null 2>&1
+#kill -9 $xvfb_pid > /dev/null 2>&1
 
 if [ -d dist ]; then
     mv dist $thisdir
