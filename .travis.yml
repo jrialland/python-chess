@@ -1,1 +1,4 @@
-script:./build_win32.sh chess3.py
+language: bash
+
+script: 
+    -  bash ./build_win32.sh chess3.py
