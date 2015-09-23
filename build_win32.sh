@@ -75,8 +75,8 @@ chmod +x virtual-wine/vwine-setup
 source ./venv_wine/bin/activate
 
 #start xvfb
-sudo Xvfb :10 -ac &
-export DISPLAY=:10
+sudo Xvfb :10 -ac -screen 0 1024x768x24 &
+export DISPLAY=:10.0
 
 hr
 #install python 2.7
