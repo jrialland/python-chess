@@ -20,11 +20,11 @@ if [ ! -f $target ]; then
 fi
 
 exe_name=$(echo `basename $target` | sed s/\\.py$/.exe/)
-
+prj_name=$(echo $exe_name | sed s/\\.exe$//)
 
 echo 'Input Python script :' $target
 echo 'Executable name : ' $exe_name
-
+echo 'Project name : ' $prj_name
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -75,7 +75,8 @@ chmod +x virtual-wine/vwine-setup
 source ./venv_wine/bin/activate
 
 #start xvfb
-sudo Xvfb :10 -ac -screen 0 1024x768x24 &
+Xvfb :10 -ac -screen 0 1024x768x24 &
+xvfb_pid=$?
 export DISPLAY=:10.0
 
 hr
@@ -106,11 +107,17 @@ wine c:/Python27/python.exe c:/pywin32_postinstall.py -install
 hr
 #compile !
 echo "Compiling $target Into .exe"
-wine c:/Python27/python.exe pyinstaller/pyinstaller.py -D $target
+wine c:/Python27/python.exe pyinstaller/pyinstaller.py --onefile $target
+cp dist/$exe_name dist/$prj_name-noupx.exe
+
+wget http://upx.sourceforge.net/download/upx391w.zip
+unzip upx391w.zip
+wine upx391w/upx.exe dist/$exe_name
 
 #turn off virtual env
 deactivate
 
+kill -9 $xvfb_pid
 
 if [ -d dist ]; then
     mv dist $thisdir
