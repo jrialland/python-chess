@@ -74,6 +74,10 @@ chmod +x virtual-wine/vwine-setup
 ./virtual-wine/vwine-setup venv_wine
 source ./venv_wine/bin/activate
 
+#start xvfb
+sudo Xvfb :10 -ac &
+export DISPLAY=:10
+
 hr
 #install python 2.7
 echo 'Installing Python 2.7.8 for win32'
