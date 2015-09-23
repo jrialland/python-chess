@@ -3,5 +3,7 @@ sudo: required
 
 script: 
     -  sudo apt-get update
-    -  sudo apt-get install xvfb unzip scons wine python-pip -y
+    -  sudo apt-get install unzip scons wine winetricks python-pip -y
+    -  winetricks allfonts
+    -  sudo apt-get xvfb x11-xkb-utils xfonts-100dpi xfonts-75dpi xfonts-scalable xfonts-cyrillic x11-app
     -  bash ./build_win32.sh chess3.py
