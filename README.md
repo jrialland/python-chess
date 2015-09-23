@@ -1,5 +1,7 @@
 # python-chess
 
+[![Build Status](https://travis-ci.org/jrialland/python-chess.svg)](https://travis-ci.org/jrialland/python-chess)
+
 chess3 is a really simple chess engine, written in python, mainly for fun..
 
 It also features an openings book.
