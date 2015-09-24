@@ -65,6 +65,8 @@ def opponent(team):
     """
     return -team
 
+def team_str(team):
+    return 'black' if team == TEAM_BLACKS else 'white'
 
 class Move:
 
@@ -867,9 +869,9 @@ def xboard_game(input=sys.stdin, output=sys.stdout):
     """plays through the xboard protocol.
        most infos found at http://home.hccnet.nl/h.g.muller/interfacing.txt
     """
-    def respond(cmd):
+    def respond(cmd, comment = False):
         logging.debug('<< ' + cmd)
-        output.write(cmd + '\n')
+        output.write(('#' if comment else '')+ cmd + '\n')
         output.flush()
 
     process_pool = Pool(cpu_count())
@@ -1001,9 +1003,11 @@ quit			: Exits
         else:
             if re.match('^[a-h][1-8][a-h][1-8].?$', cmd):
                 # receive a move from the opponent
-                move = Move(to_coord(cmd[0:2]), to_coord(cmd[2:4]))
+                move = Move(to_coord(cmd[0:2]), to_coord(cmd[2:4]))                
                 opponent_team = opponent(my_team)
                 playing_now = opponent_team
+
+                respond('# ' + team_str(opponent_team) + ' move : '+str(move))
 
                 # detect pawn promotions
                 if len(cmd) == 5:
@@ -1030,6 +1034,10 @@ quit			: Exits
 
 
 if __name__ == '__main__':
-    openingsBook.read('./Most_played_2mlj_base.bin')
-
+    import os.path
+    bookfile = './Most_played_2mlj_base.bin'
+    if os.path.exists(bookfile):
+        openingsBook.read(bookfile)
+    else:
+        logging.warn('# openings book ' + bookfile + ' not found !')
     xboard_game()
