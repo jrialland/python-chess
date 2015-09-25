@@ -96,7 +96,9 @@ fi
 #compile !
 echo "Compiling $target Into .exe"
 wine c:/Python27/python.exe pyinstaller/pyinstaller.py --onefile $target
-mv dist/$exe_name dist/$prj_name-noupx.exe
+
+echo "Copying to $prj_name-noupx.exe"
+cp dist/$exe_name dist/$prj_name-noupx.exe
 
 if [ ! -f upx391w.zip ];then
   wget http://upx.sourceforge.net/download/upx391w.zip
@@ -107,17 +109,19 @@ if [ ! -f upx391w/upx.exe ]; then
   unzip upx391w.zip
 fi
 
+echo 'Running UPX'
 wine upx391w/upx.exe dist/$exe_name
 
 #turn off virtual env
 deactivate
 
 if [ -d dist ]; then
+    rm -rf $thisdir/dist/*
     mv -f dist $thisdir
-    echo 'Generated executable in ' $thisdir/dist
+    echo 'Generated executable available in ' $thisdir/dist
 else
     echo 'Build Error'
     exit 255
 fi
 
-popd
+popd>/dev/null
