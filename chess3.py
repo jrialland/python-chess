@@ -8,6 +8,12 @@ import random
 import struct
 from multiprocessing import Pool, cpu_count
 
+try:
+   import signal
+except:
+   pass
+
+
 TEAM_WHITES = 1
 TEAM_BLACKS = -1
 ROOK_DIRECTIONS = [(1, 0), (-1, 0), (0, -1), (0, 1)]
@@ -741,7 +747,6 @@ class BoardState:
             repr = [repr[i:i + 8] for i in range(56, -1, -8)]
             return BoardState(repr=repr)
 
-
 class OpeningsBook:
 
     def __init__(self):
@@ -779,7 +784,6 @@ class OpeningsBook:
 
 openingsBook = OpeningsBook()
 
-
 def negamax_alphabeta(board, team, a=-sys.maxint, b=sys.maxint, depth=3):
     if depth == 0:
         return board.score(team)
@@ -797,13 +801,11 @@ def negamax_alphabeta(board, team, a=-sys.maxint, b=sys.maxint, depth=3):
                         return bestscore
         return bestscore
 
-
 def _eval_move(args):
     board, move, team = args
     boardafter = board.apply_move(move, team)
     score = -negamax_alphabeta(boardafter, opponent(team))
     return score, move, boardafter
-
 
 def find_best_move(process_pool, board, my_team):
     """scan the best possible move for my_team, using minimax."""
@@ -811,10 +813,11 @@ def find_best_move(process_pool, board, my_team):
     frombook = openingsBook.find_best_move(board, my_team)
     if frombook:
         return frombook
-
-    moves = process_pool.map(
-        _eval_move, [(board, m, my_team) for m in board.legal_moves(my_team)])
-    #moves = map(_eval_move, [(board, m, my_team) for m in board.legal_moves(my_team)])
+    if process_pool:
+        moves = process_pool.map(
+            _eval_move, [(board, m, my_team) for m in board.legal_moves(my_team)])
+    else:
+        moves = map(_eval_move, [(board, m, my_team) for m in board.legal_moves(my_team)])
 
     boardsafter = {move: boardafter for score, move, boardafter in moves}
 
@@ -864,8 +867,19 @@ def _play(board, my_team, process_pool, history=[], respond=lambda x: sys.stdout
             respond('#result : draw {stalemate}')
     return board, playing_now
 
+def onSIGINT(signum, frame):
+   logging.debug('SIGINT for frame %s' % (frame,))
 
-def xboard_game(input=sys.stdin, output=sys.stdout):
+def onSIGHUP(signum, frame):
+   logging.debug('SIGHUP for frame %s' % (frame,))
+
+def onSIGTERM(signum, frame):
+   logging.debug('SIGTERM for frame %s' % (frame,))
+   logging.debug('exiting...')
+   sys.exit()
+
+
+def xboard_game(command_reader=lambda:raw_input(), output=sys.stdout):
     """plays through the xboard protocol.
        most infos found at http://home.hccnet.nl/h.g.muller/interfacing.txt
     """
@@ -874,7 +888,12 @@ def xboard_game(input=sys.stdin, output=sys.stdout):
         output.write(('#' if comment else '')+ cmd + '\n')
         output.flush()
 
-    process_pool = Pool(cpu_count())
+    process_pool = None
+    try:
+        process_pool = Pool(cpu_count())
+    except:
+        logger.debug('process pool is unavailable')
+        pass
 
     board = BoardState()
     playing_now = TEAM_WHITES
@@ -888,8 +907,12 @@ def xboard_game(input=sys.stdin, output=sys.stdout):
             "#Howdy, type 'new' to start a new game, or 'help' to list supported commands")
 
     while True:
+        try:
+            line = command_reader()
+        except IOError:
+            print '#got IOError'
+            continue
 
-        line = input.readline()
         cmd = line.strip()
         logging.debug(">> " + cmd)
         if cmd == 'help':
@@ -933,11 +956,27 @@ quit			: Exits
         elif cmd == 'protover 2':
             respond('feature myname="Julien\'s chess3 0.1"')
             respond('feature ping=1')
-            respond('feature sigint=0')
-            respond('feature sigterm=0')
+            respond('feature san=0')
+
+            #install signal handlers -- http://www.gnu.org/software/xboard/engine-intf.html#7
+            try:
+               signal.signal(signal.SIGINT, onSIGINT)
+               respond('feature sigint=1')
+            except:
+               respond('feature sigint=0')
+
+            try:
+               signal.signal(signal.SIGINT, onSIGTERM)
+               respond('feature sigterm=1')
+            except:
+               respond('feature sigterm=0')
+
+
             respond('feature setboard=1')
             respond('feature debug=1')
+            respond('feature time=0')
             respond('feature done=1')
+            
 
         elif cmd.startswith('ping'):
             n = cmd.split(' ')[-1]
@@ -996,10 +1035,6 @@ quit			: Exits
         elif cmd == 'quit':
             return
 
-        elif cmd.startswith('accepted ') or cmd.startswith('time ') or cmd.startswith('otim'):
-            # silently ignore some commands
-            pass
-
         else:
             if re.match('^[a-h][1-8][a-h][1-8].?$', cmd):
                 # receive a move from the opponent
@@ -1031,7 +1066,6 @@ quit			: Exits
                         board, my_team, process_pool, history, respond)
             else:
                 respond("#ignored command : '" + cmd + "'")
-
 
 if __name__ == '__main__':
     import os.path
