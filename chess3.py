@@ -6,9 +6,9 @@ import sys
 import re
 import random
 import struct
-from multiprocessing import Pool, cpu_count
 
 try:
+    from multiprocessing import Pool, cpu_count
     import signal
 except:
     pass
@@ -877,7 +877,7 @@ def xboard_game(command_reader=lambda: raw_input(), output=sys.stdout):
     try:
         process_pool = Pool(cpu_count())
     except:
-        logger.debug('process pool is unavailable')
+        logging.debug('process pool is unavailable')
         pass
     board = BoardState()
     playing_now = TEAM_WHITES
