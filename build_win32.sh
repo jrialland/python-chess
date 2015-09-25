@@ -74,13 +74,6 @@ chmod +x virtual-wine/vwine-setup
 ./virtual-wine/vwine-setup venv_wine
 source ./venv_wine/bin/activate
 
-#start xvfb
-Xvfb :10 -ac -screen 0 1024x768x24 &
-xvfb_pid=$?
-export DISPLAY=:10.0
-echo 'DISPLAY=' $DISPLAY
-ps -p $xvfb_pid -u || true
-
 hr
 #install python 2.7
 echo 'Installing Python 2.7.8 for win32'
@@ -118,8 +111,6 @@ wine upx391w/upx.exe dist/$exe_name
 
 #turn off virtual env
 deactivate
-
-#kill -9 $xvfb_pid > /dev/null 2>&1
 
 if [ -d dist ]; then
     mv dist $thisdir
