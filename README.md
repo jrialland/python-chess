@@ -78,3 +78,8 @@ yes go | python chess3.py
 ```
 
 And see the engine play against itself ! (or type ctrl+T in XBoard)
+
+Cross "compilation" from linux to win32
+---------------------------------------
+
+Maybe the most interesting thing is that the script can be packed into a plain win32 exe without owning windows. (see build_win32.sh)
