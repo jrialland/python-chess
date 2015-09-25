@@ -9,10 +9,9 @@ import struct
 from multiprocessing import Pool, cpu_count
 
 try:
-   import signal
+    import signal
 except:
-   pass
-
+    pass
 
 TEAM_WHITES = 1
 TEAM_BLACKS = -1
@@ -71,8 +70,10 @@ def opponent(team):
     """
     return -team
 
+
 def team_str(team):
     return 'black' if team == TEAM_BLACKS else 'white'
+
 
 class Move:
 
@@ -191,31 +192,26 @@ class BoardState:
             x, y = i + di, j + dj
             if on_board(x, y) and self.is_knight(x, y, opponent_team):
                 return ('n', (x, y))
-
         # attacks from pawns
         y = j + team
         for x in [i - 1, i + 1]:
             if on_board(x, y) and self.is_pawn(x, y, opponent_team):
                 return ('p', (x, y))
-
         # attack from axis (rooks,queens)
         searched = 'RHQ' if opponent_team == TEAM_WHITES else 'rhq'
         threat = self._explore_threat(i, j, team, ROOK_DIRECTIONS, searched)
         if threat:
             return threat
-
         # attack from diagonals (bishops,queens)
         searched = 'BQ' if opponent_team == TEAM_WHITES else 'bq'
         threat = self._explore_threat(i, j, team, BISHOP_DIRECTIONS, searched)
         if threat:
             return threat
-
         # attack from kings
         for di, dj in KING_MOVES:
             x, y = i + di, j + dj
             if on_board(x, y) and self.is_king(x, y, opponent_team):
                 return ('k', (x, y))
-
         return None
 
     def find_king(self, team):
@@ -263,13 +259,11 @@ class BoardState:
                         yield Move((i, j), (i, y), promotion=p)
                 else:  # normal case
                     yield Move((i, j), (i, y))
-
                 # initial 2-cells move
                 if (j == 1 and team == TEAM_WHITES) or (j == 6 and team == TEAM_BLACKS):
                     row = 3 if team == TEAM_WHITES else 4
                     if self.get_team(i, row) == 0:
                         yield Move((i, j), (i, row), enpassant=(i, y))
-
             # pawn captures opponent
             for x in [i - 1, i + 1]:
                 if on_board(x, y) and (self.get_team(x, y) == opponent_team or (x, y) == self.enpassant_cell):
@@ -358,7 +352,6 @@ class BoardState:
                     break
             if not checked:
                 raise Exception('Illegal move')
-
         r = self._repr[::]
         i, j = move._from
 
@@ -371,7 +364,6 @@ class BoardState:
             elif move.to == (6, row) and self._is_castling_possible(team, (4, row), (7, row), [(5, row), (6, row)]):
                 r[row * 8 + 7] = '.'
                 r[row * 8 + 5] = 'R' if team == TEAM_WHITES else 'r'
-
         r[j * 8 + i] = '.'  # remove part from original position
 
         # change rook symbol after first move (prevent castling afterwards)
@@ -380,11 +372,9 @@ class BoardState:
         # change king symbol after first move (prevent castling afterwards)
         elif part in 'Aa':
             part = {'A': 'Z', 'a': 'z'}[part]
-
         x, y = move.to
         # move to target position
         r[y * 8 + x] = part if not(move.promotion) else move.promotion
-
         # enpassant rules
         if part in 'Pp':
             # when a pawn make a 2-cells move, remember that the cell behind it
@@ -393,12 +383,10 @@ class BoardState:
                 enpassant_row = 2 if team == TEAM_WHITES else 5
                 enpassant_cell = (i, enpassant_row)
                 return BoardState(repr=r, enpassant_cell=enpassant_cell)
-
             # a pawn has the right to take the enpassant cell
             if self.enpassant_cell == (x, y):
                 pawnrow = 3 if team == TEAM_BLACKS else 4
                 r[pawnrow * 8 + x] = '.'
-
         return BoardState(repr=r)
 
     def score(self, team):
@@ -626,7 +614,6 @@ class BoardState:
 
         def kind_of_piece(p):
             return dict(zip(list('pnbhrqaz'), [0, 2, 4, 6, 6, 8, 10, 10]) + zip(list('PNBHRQAZ'), [1, 3, 5, 7, 7, 9, 11, 11]))[p]
-
         piece = 0
         for j in range(8):
             for i in range(8):
@@ -634,7 +621,6 @@ class BoardState:
                 if p != '.':
                     offset_piece = 64 * kind_of_piece(p) + 8 * j + i
                     piece ^= random64[offset_piece]
-
         castle = 0
         if self._repr[4] == 'A':  # whites
             if self._repr[7] == 'H':  # king side
@@ -646,14 +632,11 @@ class BoardState:
                 castle ^= random64[768 + 2]
             if self._repr[56] == 'h':  # queen side
                 castle ^= random64[768 + 3]
-
         enpassant = 0
         if self.enpassant_cell:
             i, j = self.enpassant_cell
             enpassant = random64[772 + i]
-
         turn = random64[-1] if playingteam == TEAM_WHITES else 0
-
         return piece ^ castle ^ enpassant ^ turn
 
     def __str__(self):
@@ -747,6 +730,7 @@ class BoardState:
             repr = [repr[i:i + 8] for i in range(56, -1, -8)]
             return BoardState(repr=repr)
 
+
 class OpeningsBook:
 
     def __init__(self):
@@ -784,6 +768,7 @@ class OpeningsBook:
 
 openingsBook = OpeningsBook()
 
+
 def negamax_alphabeta(board, team, a=-sys.maxint, b=sys.maxint, depth=3):
     if depth == 0:
         return board.score(team)
@@ -801,15 +786,16 @@ def negamax_alphabeta(board, team, a=-sys.maxint, b=sys.maxint, depth=3):
                         return bestscore
         return bestscore
 
+
 def _eval_move(args):
     board, move, team = args
     boardafter = board.apply_move(move, team)
     score = -negamax_alphabeta(boardafter, opponent(team))
     return score, move, boardafter
 
+
 def find_best_move(process_pool, board, my_team):
     """scan the best possible move for my_team, using minimax."""
-
     frombook = openingsBook.find_best_move(board, my_team)
     if frombook:
         return frombook
@@ -817,23 +803,20 @@ def find_best_move(process_pool, board, my_team):
         moves = process_pool.map(
             _eval_move, [(board, m, my_team) for m in board.legal_moves(my_team)])
     else:
-        moves = map(_eval_move, [(board, m, my_team) for m in board.legal_moves(my_team)])
-
+        moves = map(_eval_move, [(board, m, my_team)
+                    for m in board.legal_moves(my_team)])
     boardsafter = {move: boardafter for score, move, boardafter in moves}
-
     if len(moves) > 0:
         opponent_team = opponent(my_team)
         maxscore, maxmove, boardafter = max(moves, key=lambda x: x[0])
         if len(moves) > 1:
             kept = [
                 move for score, move, boardafter in moves if score == maxscore]
-
             # always prefer the one that put the opponent in check
             for move in kept:
                 boardafter = boardsafter[move]
                 if boardafter.is_check(opponent_team):
                     return move
-
             # if there is still a choice to make, choose any
             return random.choice(kept)
         return maxmove
@@ -867,45 +850,43 @@ def _play(board, my_team, process_pool, history=[], respond=lambda x: sys.stdout
             respond('#result : draw {stalemate}')
     return board, playing_now
 
+
 def onSIGINT(signum, frame):
-   logging.debug('SIGINT for frame %s' % (frame,))
+    logging.debug('SIGINT for frame %s' % (frame,))
+
 
 def onSIGHUP(signum, frame):
-   logging.debug('SIGHUP for frame %s' % (frame,))
+    logging.debug('SIGHUP for frame %s' % (frame,))
+
 
 def onSIGTERM(signum, frame):
-   logging.debug('SIGTERM for frame %s' % (frame,))
-   logging.debug('exiting...')
-   sys.exit()
+    logging.debug('SIGTERM for frame %s' % (frame,))
+    logging.debug('exiting...')
+    sys.exit()
 
 
-def xboard_game(command_reader=lambda:raw_input(), output=sys.stdout):
+def xboard_game(command_reader=lambda: raw_input(), output=sys.stdout):
     """plays through the xboard protocol.
        most infos found at http://home.hccnet.nl/h.g.muller/interfacing.txt
     """
-    def respond(cmd, comment = False):
+    def respond(cmd, comment=False):
         logging.debug('<< ' + cmd)
-        output.write(('#' if comment else '')+ cmd + '\n')
+        output.write(('#' if comment else '') + cmd + '\n')
         output.flush()
-
     process_pool = None
     try:
         process_pool = Pool(cpu_count())
     except:
         logger.debug('process pool is unavailable')
         pass
-
     board = BoardState()
     playing_now = TEAM_WHITES
     my_team = TEAM_BLACKS
-
     force_mode = False
     history = []
-
     if output.isatty():
         respond(
             "#Howdy, type 'new' to start a new game, or 'help' to list supported commands")
-
     while True:
         try:
             line = command_reader()
@@ -940,7 +921,6 @@ quit			: Exits
             respond("tellics say     chess3 engine 0.1")
             respond(
                 "tellics say     (c) Julien Rialland, All rights reserved.")
-
         # tells your engine to setup the board for a new game, and consider
         # itself playing the side that will not move first, simply awaiting
         # events idly. This means it will start searching and doing a move of
@@ -952,43 +932,34 @@ quit			: Exits
             my_team = TEAM_BLACKS
             force_mode = False
             respond(board.pretty_str(comment=True))
-
         elif cmd == 'protover 2':
             respond('feature myname="Julien\'s chess3 0.1"')
             respond('feature ping=1')
             respond('feature san=0')
-
-            #install signal handlers -- http://www.gnu.org/software/xboard/engine-intf.html#7
+            # install signal handlers --
+            # http://www.gnu.org/software/xboard/engine-intf.html#7
             try:
-               signal.signal(signal.SIGINT, onSIGINT)
-               respond('feature sigint=1')
+                signal.signal(signal.SIGINT, onSIGINT)
+                respond('feature sigint=1')
             except:
-               respond('feature sigint=0')
-
+                respond('feature sigint=0')
             try:
-               signal.signal(signal.SIGINT, onSIGTERM)
-               respond('feature sigterm=1')
+                signal.signal(signal.SIGINT, onSIGTERM)
+                respond('feature sigterm=1')
             except:
-               respond('feature sigterm=0')
-
-
+                respond('feature sigterm=0')
             respond('feature setboard=1')
             respond('feature debug=1')
             respond('feature time=0')
             respond('feature done=1')
-            
-
         elif cmd.startswith('ping'):
             n = cmd.split(' ')[-1]
             respond('pong ' + n)
-
         elif cmd.startswith('setboard'):
             fen = cmd[9:].strip()
             board, playing_now = BoardState.from_FEN(fen)
-
         elif cmd == 'force':  # accept moves and just update the board
             force_mode = True
-
         elif cmd == 'go':  # start playing
             # tells the engine to start playing for the side that now has the move (regardless of what it was doing before),
             # and keep spontaneously generating moves for that side each thime
@@ -997,7 +968,6 @@ quit			: Exits
             my_team = playing_now
             board, playing_now = _play(
                 board, my_team, process_pool, history, respond)
-
         elif cmd == 'undo':
             if len(history) > 0:
                 board = history[-1]
@@ -1005,51 +975,42 @@ quit			: Exits
                 playing_now = opponent(playing_now)
             else:
                 respond('#nothing to undo')
-
         elif cmd == 'remove':
             if len(history) > 1:
                 board = history[-2]
                 history = history[:-2]
             else:
                 respond('#nothing to remove')
-
         # not part of xboard protocol, only for debugging purposes
         elif cmd == 'show':
             respond(board.pretty_str())
             respond('#MY_TEAM : ' + ['black', 'white'][my_team == TEAM_WHITES])
             respond(
                 '#PLAYING : ' + ['black', 'white'][playing_now == TEAM_WHITES])
-
         elif cmd == 'fen':
             respond(
                 board.to_FEN(team=playing_now, halfmoves=len(history) % 2, moves=len(history) / 2))
-
         elif cmd == 'white':
             my_team = TEAM_WHITES
             respond('#Playing white')
-
         elif cmd == 'black':
             my_team = TEAM_BLACKS
             respond('#Playing black')
-
         elif cmd == 'quit':
             return
-
         else:
             if re.match('^[a-h][1-8][a-h][1-8].?$', cmd):
                 # receive a move from the opponent
-                move = Move(to_coord(cmd[0:2]), to_coord(cmd[2:4]))                
+                move = Move(to_coord(cmd[0:2]), to_coord(cmd[2:4]))
                 opponent_team = opponent(my_team)
                 playing_now = opponent_team
-
-                respond('# ' + team_str(opponent_team) + ' move : '+str(move))
-
+                respond(
+                    '# ' + team_str(opponent_team) + ' move : ' + str(move))
                 # detect pawn promotions
                 if len(cmd) == 5:
                     move.promotion = cmd[-1]
                     if playing_now == TEAM_WHITES:
                         move.promotion = move.promotion.upper()
-
                 # update the board
                 history.append(board)
                 try:
@@ -1058,7 +1019,6 @@ quit			: Exits
                 except Exception:
                     respond('illegal move: ' + cmd)
                     continue
-
                 playing_now = my_team
                 # evaluate what to play
                 if not force_mode:
