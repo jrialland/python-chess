@@ -1033,5 +1033,5 @@ if __name__ == '__main__':
     if os.path.exists(bookfile):
         openingsBook.read(bookfile)
     else:
-        logging.warn('# openings book ' + bookfile + ' not found !')
+        #logging.warn('# openings book ' + bookfile + ' not found !')
     xboard_game()
