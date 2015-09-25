@@ -78,6 +78,8 @@ source ./venv_wine/bin/activate
 Xvfb :10 -ac -screen 0 1024x768x24 &
 xvfb_pid=$?
 export DISPLAY=:10.0
+echo 'DISPLAY=' $DISPLAY
+ps -p $xvfb_pid -u || true
 
 hr
 #install python 2.7
