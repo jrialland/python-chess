@@ -61,17 +61,33 @@ source ./venv_wine/bin/activate
 if [ ! -f python-2.7.8.msi ]; then
   echo 'Installing Python 2.7.8 for win32'
   wget https://www.python.org/ftp/python/2.7.8/python-2.7.8.msi
+fi
+
+if [ ! -d venv_wine/drive_c/Python27 ]; then
   wine msiexec /a python-2.7.8.msi /qn "TARGETDIR=c:/Python27"
 fi
 
-#install setuptools
 if [ ! -f ez_setup.py ]; then
-  echo 'Installing pywin32'
   wget https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py
+fi
+
+#install pip
+if [ ! -f venv_wine/drive_c/Python27/Scripts/pip.exe ]; then
+  echo 'Installing pip'
   wine c:/Python27/python.exe ez_setup.py
   wine c:/Python27/Scripts/easy_install.exe pip
+fi
+
+#install pywin32
+if [ ! -f pywin32-219.win32-py2.7.exe ]; then
   wget http://vorboss.dl.sourceforge.net/project/pywin32/pywin32/Build%20219/pywin32-219.win32-py2.7.exe
+fi
+
+if [ ! -f pywin32-219-cp27-none-win32.whl ]; then
   python -m wheel convert pywin32-219.win32-py2.7.exe
+fi
+
+if [ ! -f venv_wine/drive_c/Python27/Scripts/pywin32_testall.pyc ]; then
   wine c:/Python27/Scripts/pip.exe install $(find ./ -name "*.whl")
   unzip -p pywin32-219.win32-py2.7.exe SCRIPTS/pywin32_postinstall.py > venv_wine/drive_c/pywin32_postinstall.py || true
   wine c:/Python27/python.exe c:/pywin32_postinstall.py -install
@@ -81,7 +97,7 @@ fi
 echo "Compiling $target Into .exe"
 wine c:/Python27/python.exe pyinstaller/pyinstaller.py --onefile $target
 mv dist/$exe_name dist/$prj_name-noupx.exe
-if [ ! -f upx391w.zip ]; then
+if [ ! -f upx391w/upx.exe ]; then
   echo 'Installing upx'
   wget http://upx.sourceforge.net/download/upx391w.zip
   unzip upx391w.zip
