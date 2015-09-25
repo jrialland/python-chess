@@ -97,9 +97,13 @@ fi
 echo "Compiling $target Into .exe"
 wine c:/Python27/python.exe pyinstaller/pyinstaller.py --onefile $target
 mv dist/$exe_name dist/$prj_name-noupx.exe
+
+if [ ! -f upx391w.zip ];then
+  wget http://upx.sourceforge.net/download/upx391w.zip
+fi
+
 if [ ! -f upx391w/upx.exe ]; then
   echo 'Installing upx'
-  wget http://upx.sourceforge.net/download/upx391w.zip
   unzip upx391w.zip
 fi
 
