@@ -2,4 +2,9 @@ language: bash
 sudo: required
 
 script: 
+    -  sudo apt-get update
+    -  sudo apt-get install unzip scons wine python-pip xfonts-100dpi xfonts-75dpi xfonts-scalable xfonts-cyrillic -y
+    -  "export DISPLAY=:99.0"
+    -  "sh -e /etc/init.d/xvfb start"
+    -  sleep 3 # give xvfb some time to start
     -  bash ./build_win32.sh chess3.py
