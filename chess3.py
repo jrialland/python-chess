@@ -9,7 +9,6 @@ import struct
 
 try:
     from multiprocessing import Pool, cpu_count
-    import signal
 except:
     pass
 
@@ -851,20 +850,6 @@ def _play(board, my_team, process_pool, history=[], respond=lambda x: sys.stdout
     return board, playing_now
 
 
-def onSIGINT(signum, frame):
-    logging.debug('SIGINT for frame %s' % (frame,))
-
-
-def onSIGHUP(signum, frame):
-    logging.debug('SIGHUP for frame %s' % (frame,))
-
-
-def onSIGTERM(signum, frame):
-    logging.debug('SIGTERM for frame %s' % (frame,))
-    logging.debug('exiting...')
-    sys.exit()
-
-
 def xboard_game(command_reader=lambda: raw_input(), output=sys.stdout):
     """plays through the xboard protocol.
        most infos found at http://home.hccnet.nl/h.g.muller/interfacing.txt
@@ -933,21 +918,11 @@ quit			: Exits
             force_mode = False
             respond(board.pretty_str(comment=True))
         elif cmd == 'protover 2':
-            respond('feature myname="Julien\'s chess3 0.1"')
+            respond('feature myname="Julien\'s chess3 0.2"')
             respond('feature ping=1')
             respond('feature san=0')
-            # install signal handlers --
-            # http://www.gnu.org/software/xboard/engine-intf.html#7
-            try:
-                signal.signal(signal.SIGINT, onSIGINT)
-                respond('feature sigint=1')
-            except:
-                respond('feature sigint=0')
-            try:
-                signal.signal(signal.SIGINT, onSIGTERM)
-                respond('feature sigterm=1')
-            except:
-                respond('feature sigterm=0')
+            respond('feature sigint=0')
+            respond('feature sigterm=0')
             respond('feature setboard=1')
             respond('feature debug=1')
             respond('feature time=0')
