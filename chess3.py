@@ -6,11 +6,13 @@ import sys
 import re
 import random
 import struct
+import platform
 
-try:
-    from multiprocessing import Pool, cpu_count
-except:
-    pass
+if platform.system() != 'Windows':
+    try:
+        from multiprocessing import Pool, cpu_count
+    except:
+        pass
 
 TEAM_WHITES = 1
 TEAM_BLACKS = -1
@@ -341,7 +343,7 @@ class BoardState:
         return 0
 
     def apply_move(self, move, team, check_legal=False):
-        """modifies the board by applying the move. As BoarState instances are immutable, returns a new instance of BoardState"""
+        """Modifies the board by applying the move. As BoarState instances are immutable, returns a new instance of BoardState"""
         part = self.part_at(*move._from)
         if check_legal:
             checked = False

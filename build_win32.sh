@@ -93,6 +93,9 @@ if [ ! -f venv_wine/drive_c/Python27/Scripts/pywin32_testall.pyc ]; then
   wine c:/Python27/python.exe c:/pywin32_postinstall.py -install
 fi
 
+wine c:/Python27/Scripts/pip.exe install pefile dis3
+
+
 #compile !
 echo "Compiling $target Into .exe"
 wine c:/Python27/python.exe pyinstaller/pyinstaller.py --onefile $target
