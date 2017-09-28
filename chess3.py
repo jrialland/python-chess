@@ -839,7 +839,7 @@ def _play(board, my_team, process_pool, history=[], respond=lambda x: sys.stdout
             respond('#check')
         elif check == CHECKMATE:
             respond('#checkmate')
-            respond('#result : ' + ['black wins', 'whites win']
+            respond('#result : ' + ['whites win', 'blacks win']
                     [playing_now == TEAM_WHITES] + ' {checkmate}')
         else:
             if len(list(board.legal_moves(playing_now))) == 0:
@@ -862,7 +862,9 @@ def xboard_game(command_reader=lambda: raw_input(), output=sys.stdout):
         output.flush()
     process_pool = None
     try:
-        process_pool = Pool(cpu_count())
+        c = cpu_count()
+        logging.debug('cpu count : %d' % c)
+        process_pool = Pool(c)
     except:
         logging.debug('process pool is unavailable')
         pass
@@ -1005,6 +1007,9 @@ quit			: Exits
                 respond("#ignored command : '" + cmd + "'")
 
 if __name__ == '__main__':
+    import sys
+    if '-debug' in sys.argv:
+        logging.basicConfig(level=logging.DEBUG)
     import os.path
     bookfile = './Most_played_2mlj_base.bin'
     if os.path.exists(bookfile):
