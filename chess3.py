@@ -8,6 +8,10 @@ import random
 import struct
 import platform
 
+if sys.version_info < (3, 0):
+    sys.stdout.write("Sorry, Python 3.x\n")
+    sys.exit(1)
+
 if platform.system() != 'Windows':
     try:
         from multiprocessing import Pool, cpu_count
@@ -219,7 +223,7 @@ class BoardState:
         parts = 'AZ' if team == TEAM_WHITES else 'az'
         for p in range(64):
             if self._repr[p] in parts:
-                return p % 8, p / 8
+                return p % 8, p // 8
         return None
 
     def legal_moves(self, team):
@@ -294,7 +298,7 @@ class BoardState:
         if team == TEAM_BLACKS:
             expected = expected.lower()
         state = ''.join(
-            map(lambda pos: self.part_at(*pos), [king_pos, rook_pos] + empty_pos))
+            [self.part_at(*pos) for pos in [king_pos, rook_pos] + empty_pos])
         if state != expected:
             return False
         for pos in [king_pos, rook_pos] + empty_pos:
@@ -394,7 +398,7 @@ class BoardState:
         """Evaluates the material on the board. the scores for each part are just the ones from Claude Shannon's paper"""
         s, names = ('PBNHRQpbnhrqAZaz.' if team == TEAM_WHITES else 'pbnhrqPBNHRQAZaz.'), [
             1, 3, 3, 5, 5, 9, -1, -3, -3, -5, -5, -9, 0, 0, 0, 0, 0]
-        values = dict(zip(s, names))
+        values = dict(list(zip(s, names)))
         score = sum([values[x] for x in self._repr])
         return score
 
@@ -614,7 +618,7 @@ class BoardState:
             0xF8D626AAAF278509]
 
         def kind_of_piece(p):
-            return dict(zip(list('pnbhrqaz'), [0, 2, 4, 6, 6, 8, 10, 10]) + zip(list('PNBHRQAZ'), [1, 3, 5, 7, 7, 9, 11, 11]))[p]
+            return dict(list(zip(list('pnbhrqaz'), [0, 2, 4, 6, 6, 8, 10, 10])) + list(zip(list('PNBHRQAZ'), [1, 3, 5, 7, 7, 9, 11, 11])))[p]
         piece = 0
         for j in range(8):
             for i in range(8):
@@ -643,15 +647,16 @@ class BoardState:
     def __str__(self):
         return '#' * 9 + '\n' + '\n'.join(['#' + ''.join(self._repr[i:i + 8]) for i in range(56, -1, -8)])
 
-    def pretty_str(self, comment=True, unicode=False):
+    def pretty_str(self, comment=True, utf=False):
         rep = ''.join(self._repr).replace('a', 'k').replace('A', 'K').replace('z', 'k').replace(
             'Z', 'K').replace('h', 'r').replace('H', 'R').replace('.', ' ')
-        if unicode:
-            tr = dict(zip('prnbqkPRNBQK', '♟♜♞♝♛♚♙♖♘♗♕♔'))
+        if utf:
+            tr = dict(list(zip('prnbqkPRNBQK', '♟♜♞♝♛♚♙♖♘♗♕♔')))
             rep = ''.join([tr[c] if c in tr else c for c in rep])
         sep = '   ' + '+---' * 8 + '+'
         s = [sep]
-        for l in [str(1 + i / 8) + '. | ' + ' | '.join(list(rep[i:i + 8])) + ' |' for i in range(56, -1, -8)]:
+				
+        for l in [str(1 + i // 8) + '. | ' + ' | '.join(list(rep[i:i + 8])) + ' |' for i in range(56, -1, -8)]:
             s += [l, sep]
         s += ['     ' + '.  '.join('abcdefgh') + '.']
         if comment:
@@ -739,7 +744,7 @@ class OpeningsBook:
 
     def read(self, polyglot):
         if type(polyglot) == str:
-            polyglot = file(polyglot, 'rb')
+            polyglot = open(polyglot, 'rb')
         format = struct.Struct('>QHHL')
 
         def readchunk():
@@ -770,11 +775,11 @@ class OpeningsBook:
 openingsBook = OpeningsBook()
 
 
-def negamax_alphabeta(board, team, a=-sys.maxint, b=sys.maxint, depth=3):
+def negamax_alphabeta(board, team, a=-sys.maxsize, b=sys.maxsize, depth=3):
     if depth == 0:
         return board.score(team)
     else:
-        bestscore, bestmove = -sys.maxint, None
+        bestscore, bestmove = -sys.maxsize, None
         for childmove in board.legal_moves(team):
             score = - \
                 negamax_alphabeta(
@@ -804,8 +809,8 @@ def find_best_move(process_pool, board, my_team):
         moves = process_pool.map(
             _eval_move, [(board, m, my_team) for m in board.legal_moves(my_team)])
     else:
-        moves = map(_eval_move, [(board, m, my_team)
-                    for m in board.legal_moves(my_team)])
+        moves = list(map(_eval_move, [(board, m, my_team)
+                    for m in board.legal_moves(my_team)]))
     boardsafter = {move: boardafter for score, move, boardafter in moves}
     if len(moves) > 0:
         opponent_team = opponent(my_team)
@@ -852,7 +857,7 @@ def _play(board, my_team, process_pool, history=[], respond=lambda x: sys.stdout
     return board, playing_now
 
 
-def xboard_game(command_reader=lambda: raw_input(), output=sys.stdout):
+def xboard_game(command_reader=lambda: input(), output=sys.stdout):
     """plays through the xboard protocol.
        most infos found at http://home.hccnet.nl/h.g.muller/interfacing.txt
     """
@@ -880,7 +885,7 @@ def xboard_game(command_reader=lambda: raw_input(), output=sys.stdout):
         try:
             line = command_reader()
         except IOError:
-            print '#got IOError'
+            print('#got IOError')
             continue
 
         cmd = line.strip()
@@ -996,6 +1001,7 @@ quit			: Exits
                     board = board.apply_move(
                         move, playing_now, check_legal=True)
                 except Exception:
+                    logging.exception('illegal move: ' + cmd)
                     respond('illegal move: ' + cmd)
                     continue
                 playing_now = my_team
@@ -1007,7 +1013,6 @@ quit			: Exits
                 respond("#ignored command : '" + cmd + "'")
 
 if __name__ == '__main__':
-    import sys
     if '-debug' in sys.argv:
         logging.basicConfig(level=logging.DEBUG)
     import os.path
