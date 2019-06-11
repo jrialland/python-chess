@@ -1,6 +1,0 @@
-[submodule "_win32/pyinstaller"]
-	path = _win32/pyinstaller
-	url = https://github.com/pyinstaller/pyinstaller
-[submodule "_win32/virtual-wine"]
-	path = _win32/virtual-wine
-	url = https://github.com/htgoebel/virtual-wine
