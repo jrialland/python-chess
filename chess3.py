@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding:utf-8 -*-
 
 import logging
@@ -96,6 +96,9 @@ class Move:
         if self.promotion:
             m += self.promotion.lower()
         return m
+
+    def dest_square(self):
+        return to_pos(*self.to)
 
     def __str__(self):
         s = str(self._from) + ' -> ' + str(self.to)
@@ -226,6 +229,82 @@ class BoardState:
                 return p % 8, p // 8
         return None
 
+    def find_move_from_san(self, san, team):
+        origsan = san
+        san = re.sub('\+|#|x', '', san)
+        candidates = list(self.legal_moves(team))
+        if san == 'O-O':
+            candidates = [m for m in candidates if m.castling and m.to[0] == 6]
+        elif san == 'O-O-O':
+            candidates = [m for m in candidates if m.castling and m.to[0] == 2]
+        elif '=' in san:
+            candidates = [m for m in candidates if to_pos(
+                *m._from)[0] == san[0] and m.promotion and m.promotion.upper() == san[-1]]
+            if 'x' in origsan:
+                tocol = origsan[origsan.index('x')+1]
+                candidates = [
+                    m for m in candidates if to_pos(*m.to)[0] == tocol]
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        target = san[-2:]
+        candidates = [m for m in candidates if m.dest_square() == target]
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        if len(san) == 2:
+            candidates = [
+                m for m in candidates if self.piece_at(*m._from) == 'P']
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        if san[0] in 'RNBQKP':
+            candidates = [
+                m for m in candidates if self.piece_at(*m._from) == san[0]]
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        if san[0] in 'abcdefgh':
+            candidates = [m for m in candidates if to_pos(
+                *m._from)[0] == san[0] and self.piece_at(*m._from) == 'P']
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        if san[0] in 'abcdefgh':
+            candidates = [m for m in candidates if to_pos(
+                *m._from)[0] == san[0]]
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        if san[1] in 'abcdefgh':
+            candidates = [m for m in candidates if to_pos(
+                *m._from)[0] == san[1]]
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        if san[0] in '12345678':
+            candidates = [m for m in candidates if to_pos(
+                *m._from)[1] == san[0]]
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        if san[1] in '12345678':
+            candidates = [m for m in candidates if to_pos(
+                *m._from)[1] == san[1]]
+        if not candidates:
+            return None
+        if len(candidates) == 1:
+            return candidates[0]
+        return None
+
     def legal_moves(self, team):
         for j in range(8):
             for i in range(8):
@@ -287,21 +366,25 @@ class BoardState:
         if (i, j) in [(4, 0), (4, 7)]:
             row = 0 if team == TEAM_WHITES else 7
             # left side
-            if self._is_castling_possible(team, (4, row), (0, row), [(1, row), (2, row), (3, row)]):
+            if self._is_castling_possible(team, (4, row), (0, row), [(2, row), (3, row)]):
                 yield Move(_from=(4, row), to=(2, row), castling=True)
             # right side
             if self._is_castling_possible(team, (4, row), (7, row), [(5, row), (6, row)]):
                 yield Move(_from=(4, row), to=(6, row), castling=True)
 
     def _is_castling_possible(self, team, king_pos, rook_pos, empty_pos):
-        expected = 'AH' + '.' * len(empty_pos)
+        state = ''.join([self.part_at(i, king_pos[1]) for i in range(8)])
+        if rook_pos[0] == 0:  # O-O-O
+            expected = 'H...A'
+            state = state[:5]
+        else:  # O-O
+            expected = 'A..H'
+            state = state[4:]
         if team == TEAM_BLACKS:
             expected = expected.lower()
-        state = ''.join(
-            [self.part_at(*pos) for pos in [king_pos, rook_pos] + empty_pos])
         if state != expected:
             return False
-        for pos in [king_pos, rook_pos] + empty_pos:
+        for pos in [king_pos] + empty_pos:
             if self.is_under_attack(*pos, team=team):
                 return False
         return True
@@ -338,6 +421,9 @@ class BoardState:
     def part_at(self, i, j):
         """Returns the content of the board at this position"""
         return self._repr[j * 8 + i]
+
+    def piece_at(self, i, j):
+        return self.part_at(i, j).upper().replace('H', 'R').replace('A', 'K').replace('Z', 'K')
 
     def is_check(self, team):
         """Returns 0 if not check, 1 if check, 2 if checkmate"""
@@ -655,7 +741,7 @@ class BoardState:
             rep = ''.join([tr[c] if c in tr else c for c in rep])
         sep = '   ' + '+---' * 8 + '+'
         s = [sep]
-				
+
         for l in [str(1 + i // 8) + '. | ' + ' | '.join(list(rep[i:i + 8])) + ' |' for i in range(56, -1, -8)]:
             s += [l, sep]
         s += ['     ' + '.  '.join('abcdefgh') + '.']
@@ -772,6 +858,7 @@ class OpeningsBook:
         else:
             return None
 
+
 openingsBook = OpeningsBook()
 
 
@@ -810,7 +897,7 @@ def find_best_move(process_pool, board, my_team):
             _eval_move, [(board, m, my_team) for m in board.legal_moves(my_team)])
     else:
         moves = list(map(_eval_move, [(board, m, my_team)
-                    for m in board.legal_moves(my_team)]))
+                                      for m in board.legal_moves(my_team)]))
     boardsafter = {move: boardafter for score, move, boardafter in moves}
     if len(moves) > 0:
         opponent_team = opponent(my_team)
@@ -984,17 +1071,20 @@ quit			: Exits
             return
         else:
             if re.match('^[a-h][1-8][a-h][1-8].?$', cmd):
-                # receive a move from the opponent
                 move = Move(to_coord(cmd[0:2]), to_coord(cmd[2:4]))
-                opponent_team = opponent(my_team)
-                playing_now = opponent_team
-                respond(
-                    '# ' + team_str(opponent_team) + ' move : ' + str(move))
                 # detect pawn promotions
                 if len(cmd) == 5:
                     move.promotion = cmd[-1]
                     if playing_now == TEAM_WHITES:
                         move.promotion = move.promotion.upper()
+            else:
+                move = board.find_move_from_san(cmd, opponent(my_team))
+            # received a move from the opponent
+            if move:
+                opponent_team = opponent(my_team)
+                playing_now = opponent_team
+                respond('# ' + team_str(opponent_team) +
+                        ' move : ' + str(move))
                 # update the board
                 history.append(board)
                 try:
@@ -1012,6 +1102,7 @@ quit			: Exits
             else:
                 respond("#ignored command : '" + cmd + "'")
 
+
 if __name__ == '__main__':
     if '-debug' in sys.argv:
         logging.basicConfig(level=logging.DEBUG)
@@ -1021,5 +1112,5 @@ if __name__ == '__main__':
         openingsBook.read(bookfile)
     else:
         pass
-        #logging.warn('# openings book ' + bookfile + ' not found !')
+        # logging.warn('# openings book ' + bookfile + ' not found !')
     xboard_game()
