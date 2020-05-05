@@ -8,8 +8,10 @@ import random
 import struct
 import platform
 
+__version__ = '0.3 April 2020'
+
 if sys.version_info < (3, 0):
-    sys.stdout.write("Sorry, Python 3.x\n")
+    sys.stdout.write("Sorry, Python 3+ only\n")
     sys.exit(1)
 
 if platform.system() != 'Windows':
@@ -101,7 +103,7 @@ class Move:
         return to_pos(*self.to)
 
     def __str__(self):
-        s = str(self._from) + ' -> ' + str(self.to)
+        s = to_pos(*self._from) + ' -> ' + to_pos(*self.to)
         attrs = []
         if self.promotion:
             attrs.append('promotion=' + str(self.promotion))
@@ -999,7 +1001,7 @@ quit			: Exits
 
 """)
         elif cmd == 'xboard':
-            respond("tellics say     chess3 engine 0.1")
+            respond("tellics say     chess3 engine "+ __version__)
             respond(
                 "tellics say     (c) Julien Rialland, All rights reserved.")
         # tells your engine to setup the board for a new game, and consider
@@ -1014,7 +1016,7 @@ quit			: Exits
             force_mode = False
             respond(board.pretty_str(comment=True))
         elif cmd == 'protover 2':
-            respond('feature myname="Julien\'s chess3 0.2"')
+            respond('feature myname="Julien\'s chess3 ' + __version__)
             respond('feature ping=1')
             respond('feature san=0')
             respond('feature sigint=0')
@@ -1083,8 +1085,8 @@ quit			: Exits
             if move:
                 opponent_team = opponent(my_team)
                 playing_now = opponent_team
-                respond('# ' + team_str(opponent_team) +
-                        ' move : ' + str(move))
+                respond('# you (' + team_str(opponent_team) +
+                        ') moved : ' + str(move))
                 # update the board
                 history.append(board)
                 try:
