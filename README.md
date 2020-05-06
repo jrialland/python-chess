@@ -127,3 +127,10 @@ and play against it, or type crtl-T to see it play against itself, which is quit
 
 * You can also run it directly in a terminal : `./chess3.py`
 
+Installation
+------------
+
+```
+pip install git+https://github.com/jrialland/python-chess
+```
+
