@@ -1,4 +1,6 @@
 rm -f xboard.debug
 PYTHON=$(which python3)
-xboard -debugMode true -cp -fcp "$PYTHON chess3.py" -scp "$PYTHON chess3.py"
+CMD="$PYTHON -m chess3"
+
+xboard -debugMode true -cp -fcp "$CMD" -scp "$CMD"
 
