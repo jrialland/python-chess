@@ -1,3 +1,4 @@
-rm -f chess.log
 rm -f xboard.debug
-xboard -debugMode true -cp -fcp "python chess3.py" -scp "python chess3.py"
+PYTHON=$(which python3)
+xboard -debugMode true -cp -fcp "$PYTHON chess3.py" -scp "$PYTHON chess3.py"
+
