@@ -32,6 +32,8 @@ KING_MOVES = [
 CHECK = 1
 CHECKMATE = 2
 
+#default search depth
+DEFAULT_DEPTH=3
 
 def to_pos(i, j):
     """Convert a coordinate (with 0,0 at bottom left) on the board to the standard representation
@@ -882,7 +884,7 @@ class OpeningsBook:
 openingsBook = OpeningsBook()
 
 
-def negamax_alphabeta(board, team, a=-sys.maxsize, b=sys.maxsize, depth=3):
+def negamax_alphabeta(board, team, a=-sys.maxsize, b=sys.maxsize, depth=DEFAULT_DEPTH):
     if depth == 0:
         return board.score(team)
     else:
@@ -901,24 +903,29 @@ def negamax_alphabeta(board, team, a=-sys.maxsize, b=sys.maxsize, depth=3):
 
 
 def _eval_move(args):
-    board, move, team = args
+    board, move, team, depth = args
     boardafter = board.apply_move(move, team)
-    score = -negamax_alphabeta(boardafter, opponent(team))
+    score = -negamax_alphabeta(boardafter, opponent(team), depth=depth)
+    print('#', move.to_xboard_notation(), score)
     return score, move, boardafter
 
 
-def find_best_move(process_pool, board, my_team):
+def find_best_move(process_pool, board, my_team, depth=DEFAULT_DEPTH):
     """scan the best possible move for my_team, using minimax."""
+    
     frombook = openingsBook.find_best_move(board, my_team)
     if frombook:
         return frombook
+
     if process_pool:
         moves = process_pool.map(
-            _eval_move, [(board, m, my_team) for m in board.legal_moves(my_team)])
+            _eval_move, [(board, m, my_team, depth) for m in board.legal_moves(my_team)])
     else:
-        moves = list(map(_eval_move, [(board, m, my_team)
+        moves = list(map(_eval_move, [(board, m, my_team, depth)
                                       for m in board.legal_moves(my_team)]))
+                                      
     boardsafter = {move: boardafter for score, move, boardafter in moves}
+    
     if len(moves) > 0:
         opponent_team = opponent(my_team)
         maxscore, maxmove, boardafter = max(moves, key=lambda x: x[0])
