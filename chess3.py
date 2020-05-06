@@ -86,12 +86,13 @@ class Move:
 
     """represent a player's action"""
 
-    def __init__(self, _from, to, promotion=None, enpassant=None, castling=False):
+    def __init__(self, _from, to, promotion=None, enpassant=None, castling=False, capture=False):
         self._from = _from
         self.to = to
         self.promotion = promotion
         self.enpassant = enpassant
         self.castling = castling
+        self.capture = capture
 
     def to_xboard_notation(self):
         m = to_pos(*self._from) + to_pos(*self.to)
@@ -103,7 +104,7 @@ class Move:
         return to_pos(*self.to)
 
     def __str__(self):
-        s = to_pos(*self._from) + ' -> ' + to_pos(*self.to)
+        s = str(self._from) + ' -> ' + str(self.to)
         attrs = []
         if self.promotion:
             attrs.append('promotion=' + str(self.promotion))
@@ -111,9 +112,14 @@ class Move:
             attrs.append('castling=true')
         if self.enpassant:
             attrs.append('enpassant=' + str(self.enpassant))
+        if self.capture:
+            attrs.append('capture=' + str(self.enpassant))
         if attrs:
             s += ' [' + ', '.join(attrs) + ']'
         return s
+
+    def __repr__(self):
+        return self.to_xboard_notation()
 
     @classmethod
     def from_polyglot(clazz, move, team=TEAM_WHITES):
@@ -143,9 +149,12 @@ class Move:
 
 class BoardState:
 
-    def __init__(self, repr=list('HNBQABNH' + 'P' * 8 + '.' * 32 + 'p' * 8 + 'hnbqabnh'), enpassant_cell=None):
+    def __init__(self, repr=list('HNBQABNH' + 'P' * 8 + '.' * 32 + 'p' * 8 + 'hnbqabnh'), enpassant_cell=None, halfmoves=0, moves=1, trait='w'):
         self._repr = repr
         self.enpassant_cell = enpassant_cell
+        self.halfmoves = halfmoves
+        self.moves = moves
+        self.trait = trait
 
     def get_part(self, i, j):
         return state[j * 8 + i]
@@ -333,8 +342,10 @@ class BoardState:
         elif self.is_knight(i, j, team):
             for di, dj in KNIGHT_MOVES:
                 x, y = i + di, j + dj
-                if on_board(x, y) and self.get_team(x, y) in [0, opponent_team]:
-                    yield Move((i, j), (x, y))
+                if on_board(x, y):
+                    op = self.get_team(x, y)
+                    if op in [0, opponent_team]:
+                        yield Move((i, j), (x, y), capture=(op != 0))
         elif self.is_pawn(i, j, team):
             y = j + team
             # normal move (i.e not capturing)
@@ -356,14 +367,16 @@ class BoardState:
                     if y in [0, 7]:  # pawn promotion
                         possibleproms = 'NBRQ' if team == TEAM_WHITES else 'nbrq'
                         for p in possibleproms:
-                            yield Move((i, j), (x, y), promotion=p)
+                            yield Move((i, j), (x, y), promotion=p, capture=True)
                     else:
-                        yield Move(_from=(i, j), to=(x, y))
+                        yield Move(_from=(i, j), to=(x, y), capture=True)
         elif self.is_king(i, j, team):
             for di, dj in KING_MOVES:
                 x, y = i + di, j + dj
-                if on_board(x, y) and self.get_team(x, y) != team:
-                    yield Move((i, j), (x, y))
+                if on_board(x, y):
+                    op = self.get_team(x, y)
+                    if op != team:
+                        yield Move((i, j), (x, y), capture=(op != 0))
         # castling
         if (i, j) in [(4, 0), (4, 7)]:
             row = 0 if team == TEAM_WHITES else 7
@@ -414,7 +427,7 @@ class BoardState:
                 if on_board(x, y):
                     cellteam = self.get_team(x, y)
                     if cellteam != team:
-                        yield Move((i, j), (x, y))
+                        yield Move((i, j), (x, y), capture=(cellteam != 0))
                     if cellteam == 0:
                         go = True
                     x += di
@@ -436,6 +449,8 @@ class BoardState:
 
     def apply_move(self, move, team, check_legal=False):
         """Modifies the board by applying the move. As BoarState instances are immutable, returns a new instance of BoardState"""
+        newtrait = 'w' if self.trait == 'b' else 'b'
+        newmoves = self.moves + int(self.trait == 'b')
         part = self.part_at(*move._from)
         if check_legal:
             checked = False
@@ -451,9 +466,11 @@ class BoardState:
         # castling
         row = 0 if team == TEAM_WHITES else 7
         if part in 'Aa' and move._from == (4, row):
-            if move.to == (2, row) and self._is_castling_possible(team, (4, row), (0, row), [(1, row), (2, row), (3, row)]):
+            # O-O-O
+            if move.to == (2, row) and self._is_castling_possible(team, (4, row), (0, row), [(2, row), (3, row)]):
                 r[row * 8] = '.'
                 r[row * 8 + 3] = 'R' if team == TEAM_WHITES else 'r'
+            # O-O
             elif move.to == (6, row) and self._is_castling_possible(team, (4, row), (7, row), [(5, row), (6, row)]):
                 r[row * 8 + 7] = '.'
                 r[row * 8 + 5] = 'R' if team == TEAM_WHITES else 'r'
@@ -475,12 +492,13 @@ class BoardState:
             if abs(j - y) == 2:
                 enpassant_row = 2 if team == TEAM_WHITES else 5
                 enpassant_cell = (i, enpassant_row)
-                return BoardState(repr=r, enpassant_cell=enpassant_cell)
+                return BoardState(repr=r, enpassant_cell=enpassant_cell, halfmoves=0, moves=newmoves, trait=newtrait)
             # a pawn has the right to take the enpassant cell
             if self.enpassant_cell == (x, y):
                 pawnrow = 3 if team == TEAM_BLACKS else 4
                 r[pawnrow * 8 + x] = '.'
-        return BoardState(repr=r)
+        newhalfmoves = 0 if part in 'pP' or move.capture else self.halfmoves+1
+        return BoardState(repr=r, halfmoves=newhalfmoves, moves=newmoves, trait=newtrait)
 
     def score(self, team):
         """Evaluates the material on the board. the scores for each part are just the ones from Claude Shannon's paper"""
@@ -752,7 +770,7 @@ class BoardState:
         else:
             return '\n'.join(s)
 
-    def to_FEN(self, team=TEAM_WHITES, halfmoves=0, moves=1):
+    def to_FEN(self):
         """Convert to the standard FEN representation"""
         fen = ''
         for j in range(7, -1, -1):
@@ -764,7 +782,7 @@ class BoardState:
         fen = re.sub('H', 'R', fen)
         for j in range(8, 0, -1):
             fen = fen.replace(j * '.', str(j))
-        fen += ' ' + ['b', 'w'][team == TEAM_WHITES]
+        fen += ' ' + self.trait
         castlings = ''
         if self._repr[4] == 'A':
             if self._repr[7] == 'H':
@@ -784,7 +802,7 @@ class BoardState:
             fen += ' -'
         else:
             fen += ' ' + to_pos(*self.enpassant_cell)
-        fen += ' ' + str(halfmoves) + ' ' + str(moves)
+        fen += ' ' + str(self.halfmoves) + ' ' + str(self.moves)
         return fen
 
     @classmethod
@@ -810,7 +828,7 @@ class BoardState:
             rep[60] = 'a'
             rep[56] = 'h'
         board = BoardState(
-            repr=rep, enpassant_cell=None if enpassant == '-' else to_coord(enpassant))
+            repr=rep, enpassant_cell=None if enpassant == '-' else to_coord(enpassant), halfmoves=int(halfmoves), moves=int(moves))
         team = [TEAM_BLACKS, TEAM_WHITES][turn == 'w']
         return board, team
 
@@ -1001,7 +1019,7 @@ quit			: Exits
 
 """)
         elif cmd == 'xboard':
-            respond("tellics say     chess3 engine "+ __version__)
+            respond("tellics say     chess3 engine " + __version__)
             respond(
                 "tellics say     (c) Julien Rialland, All rights reserved.")
         # tells your engine to setup the board for a new game, and consider
@@ -1061,8 +1079,7 @@ quit			: Exits
             respond(
                 '#PLAYING : ' + ['black', 'white'][playing_now == TEAM_WHITES])
         elif cmd == 'fen':
-            respond(
-                board.to_FEN(team=playing_now, halfmoves=len(history) % 2, moves=len(history) / 2))
+            respond(board.to_FEN())
         elif cmd == 'white':
             my_team = TEAM_WHITES
             respond('#Playing white')
